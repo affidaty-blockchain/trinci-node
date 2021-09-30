@@ -1,0 +1,64 @@
+#
+# Blockchain node configuration file.
+#
+# If any of the configuration parameters is not explicitly specified then the
+# built-in default value is used.
+#
+
+# Validator node participating to consensus.
+# Default: false
+validator = false
+
+# Logger verbosity level.
+# Available options: off, error, warn, info, debug, trace.
+# Default: info
+log-level = "debug"
+
+# Node keypair file.
+# Default: dynamically generated
+keypair-path = "data/ed25519_keypair.bin"
+
+# Node bootstrap file in WASM format.
+# Default: "data/bootstrap.wasm"
+bootstrap-path = "data/bootstrap.wasm"
+
+# Network indentifier.
+# Default: "skynet".
+network = "skynet"
+
+# Http service address.
+# Default: 127.0.0.1
+rest-addr = "127.0.0.1"
+
+# Http service port.
+# Default: 8000
+rest-port = 8000
+
+# Bridge service address.
+# Default: 127.0.0.1
+bridge-addr = "127.0.0.1"
+
+# Bridge service port.
+# Default: 8001
+bridge-port = 8001
+
+# P2P service address.
+# Default: 127.0.0.1
+p2p-addr = "0.0.0.0"
+
+# Max number of transactions per block.
+# Default: 42
+block-threshold = 3000
+
+# Max time (in seconds) that a transaction is left in the unconfirmed transaction
+# pool before try to generate a new block.
+# Default: 3
+block-timeout = 1
+
+# Database path within the file system.
+# Default: "db"
+db-path = "db"
+
+# Wasm machine max number of cached contracts.
+# Default: 10 (totally arbitrary value)
+wm-cache-max = 10

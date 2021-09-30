@@ -1,0 +1,4 @@
+TRINCI
+======
+
+TRINCI Blockchain Node.
