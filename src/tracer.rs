@@ -51,10 +51,11 @@ pub fn run(tx_chan: BlockRequestSender) {
 
     let msg = Message::Subscribe {
         id: "tracer".to_owned(),
-        events: Event::BLOCK | Event::TRANSACTION,
+        events: Event::BLOCK,
         packed: false,
     };
 
+    // Get subscription channel.
     let rx_chan = match tx_chan.send_sync(msg) {
         Ok(chan) => chan,
         Err(_) => {
@@ -63,26 +64,13 @@ pub fn run(tx_chan: BlockRequestSender) {
         }
     };
 
-    let mut count = 0;
     loop {
         match rx_chan.recv_sync() {
             Ok(Message::GetBlockResponse { block, .. }) => {
                 tracer.update(block.height as usize, block.size as usize);
             }
-            Ok(Message::GetTransactionResponse { tx }) => {
-                debug!("[tracer] new transaction for {}", tx.data.account);
-                count += 1;
-                if count == 3 {
-                    // Just to test the unsubscribe functionality...
-                    let msg = Message::Unsubscribe {
-                        id: "tracer".to_owned(),
-                        events: Event::TRANSACTION,
-                    };
-                    tx_chan.send_sync(msg).unwrap();
-                }
-            }
             Ok(res) => {
-                warn!("[tracer] {:?}", res);
+                warn!("[tracer] unexpected message {:?}", res);
             }
             Err(_) => {
                 warn!("[tracer] blockchain channel closed");
