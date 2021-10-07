@@ -101,7 +101,6 @@ fn bootstrap_monitor(chan: BlockRequestSender, wm: Arc<Mutex<WmLocal>>) {
         .send_sync(Message::Subscribe {
             id: "bootstrap".to_string(),
             events: Event::BLOCK,
-            packed: false,
         })
         .unwrap();
     loop {

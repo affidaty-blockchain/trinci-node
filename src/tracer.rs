@@ -52,7 +52,6 @@ pub fn run(tx_chan: BlockRequestSender) {
     let msg = Message::Subscribe {
         id: "tracer".to_owned(),
         events: Event::BLOCK,
-        packed: false,
     };
 
     // Get subscription channel.
