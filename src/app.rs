@@ -152,6 +152,7 @@ impl App {
             keypair,
             addr: config.p2p_addr.clone(),
             network: config.network.clone(),
+            bootstrap_addr: config.p2p_bootstrap_addr.clone(),
         };
         let p2p_svc = PeerService::new(p2p_config, chan.clone());
 
