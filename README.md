@@ -1,10 +1,10 @@
 TRINCI
 ======
 
-# Quickstart
+TRINCI Blockchain Node.
 
-# Installation
 ## Requirements
+
 The required dependencies to build correctly the project are the following:
 
 - clang
@@ -23,7 +23,9 @@ rm Cargo.lock
 ```
  
 ## Dependencies installation
+
 ### Ubuntu/Debian installation
+
 update the package list:
 
 ```
@@ -37,6 +39,7 @@ sudo apt-get install clang libclang-dev protobuf-compiler
 ```
 
 ### Fedora/RHEL
+
 update the package list:
 
 ```
@@ -49,6 +52,7 @@ sudo dnf install clang rust-clang-sys+clang_11_0-devel protobuf-compiler
 ```
 
 ## Build
+
 to build the cargo package:
 
 ```
@@ -57,6 +61,7 @@ cargo build
 ```
 
 # Initialization
+
 To make possible to the node to generate new blocks, run it as validator:
 
 ```
@@ -64,5 +69,3 @@ cargo run -- --validator
 ```
 
 **Note:** by only running `cargo run`  it launches the node as a follower, this implies that the node can't generate blocks, but only execute those (blocks) present in the p2p network that need to be executed.
-
-TRINCI Blockchain Node.
