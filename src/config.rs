@@ -170,6 +170,9 @@ impl Config {
         if let Some(value) = map.get("p2p-addr").and_then(|value| value.as_str()) {
             config.p2p_addr = value.to_owned();
         }
+        if let Some(value) = map.get("p2p-bootstrap-addr").and_then(|value| value.as_str()) {
+            config.p2p_bootstrap_addr = Some(value.to_owned());
+        }
         if let Some(value) = map
             .get("block-threshold")
             .and_then(|value| value.as_integer())
