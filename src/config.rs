@@ -91,6 +91,8 @@ pub struct Config {
     pub bridge_port: u16,
     /// P2P service address.
     pub p2p_addr: String,
+    /// P2P service bootstrap address.
+    pub p2p_bootstrap_addr: Option<String>,
     /// Blockchain database folder path.
     pub db_path: String,
     /// Bootstrap wasm file path.
@@ -113,6 +115,7 @@ impl Default for Config {
             bridge_addr: DEFAULT_BRIDGE_ADDR.to_string(),
             bridge_port: DEFAULT_BRIDGE_PORT,
             p2p_addr: DEFAULT_P2P_ADDR.to_string(),
+            p2p_bootstrap_addr: None,
             db_path: DEFAULT_DB_PATH.to_string(),
             bootstrap_path: DEFAULT_BOOTSTRAP_PATH.to_string(),
             wm_cache_max: DEFAULT_WM_CACHE_MAX,
@@ -281,6 +284,13 @@ pub fn create_app_config() -> Config {
                 .value_name("ADDRESS")
                 .required(false),
         )
+        .arg(
+            clap::Arg::with_name("p2p-bootstrap-addr")
+                .long("p2p-bootstrap-addr")
+                .help("Peer2Peer service bootstrap address (default '127.0.0.1')")
+                .value_name("ADDRESS")
+                .required(false),
+        )
         .get_matches();
 
     let config_file = matches.value_of("config").unwrap_or(DEFAULT_CONFIG_FILE);
@@ -323,6 +333,9 @@ pub fn create_app_config() -> Config {
     if let Some(value) = matches.value_of("p2p-addr") {
         config.p2p_addr = value.to_owned();
     }
+    if let Some(value) = matches.value_of("p2p-bootstrap-addr") {
+        config.p2p_bootstrap_addr = Some(value.to_owned());
+    }
     config
 }
 
@@ -347,6 +360,7 @@ mod tests {
                 bridge-addr = '{}'\n\
                 bridge-port = {}\n\
                 p2p-addr = '{}'\n\
+                p2p-bootstrap-addr = '{}'\n\
                 db-path = '{}'\n\
                 bootstrap-path = '{}'\n\
                 wm-cache-max = {}",
@@ -360,6 +374,7 @@ mod tests {
                 self.bridge_addr,
                 self.bridge_port,
                 self.p2p_addr,
+                self.p2p_bootstrap_addr.clone().unwrap_or_default(),
                 self.db_path,
                 self.bootstrap_path,
                 self.wm_cache_max
@@ -380,6 +395,7 @@ mod tests {
             bridge_addr: "5.6.7.8".to_string(),
             bridge_port: 987,
             p2p_addr: "9.1.2.3".to_string(),
+            p2p_bootstrap_addr: Some("1.0.0.3".to_string()),
             db_path: "dummy/db/path".to_string(),
             bootstrap_path: "dummy/boot/path".to_string(),
             wm_cache_max: 42,

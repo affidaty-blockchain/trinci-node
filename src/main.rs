@@ -79,6 +79,10 @@ fn show_config(config: &Config) {
         config.bridge_addr, config.bridge_port
     );
     info!("  P2P service address:    {}", config.p2p_addr);
+    info!(
+        "  P2P bootstrap address:  {}",
+        config.p2p_bootstrap_addr.clone().unwrap_or_default()
+    );
 }
 
 fn main() {
