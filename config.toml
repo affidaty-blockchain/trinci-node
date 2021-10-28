@@ -7,7 +7,7 @@
 
 # Validator node participating to consensus.
 # Default: false
-validator = false
+validator = true
 
 # Logger verbosity level.
 # Available options: off, error, warn, info, debug, trace.
