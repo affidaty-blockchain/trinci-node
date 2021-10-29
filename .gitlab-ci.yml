@@ -1,0 +1,63 @@
+image: davxy/rust-builder
+
+variables:
+    DEPLOY_HOST: "10.200.0.100"
+
+stages:
+    - lints
+    - build
+    - test
+    - deploy
+
+lints:
+    stage: lints
+    script:
+        - cargo fmt --all -- --check
+        - cargo clippy --all -- -D warnings
+
+build:
+    stage: build
+    dependencies:
+        - lints
+    script:
+        - cargo build
+
+test:
+    stage: test
+    dependencies:
+        - build
+    script:
+        - cargo test
+
+deploy_nightly:
+    stage: deploy
+    dependencies:
+        - test
+    only:
+        - master
+    script:
+        - cargo build --out-dir build -Z unstable-options
+        - strip build/trinci-node
+        - scp build/trinci-node runner@${DEPLOY_HOST}:trinci/nightly/trinci_new
+
+deploy_staging:
+    stage: deploy
+    dependencies:
+        - test
+    only:
+        - tags
+    script:
+        - cargo build --out-dir $(pwd)/build -Z unstable-options
+        - strip build/trinci-node
+        - scp build/trinci-node runner@${DEPLOY_HOST}:trinci/staging/trinci_new
+
+deploy_release:
+    stage: deploy
+    dependencies:
+        - test
+    only:
+        - tags
+    script:
+        - cargo build --release --out-dir $(pwd)/build -Z unstable-options
+        - strip build/trinci-node
+        - scp build/trinci-node runner@${DEPLOY_HOST}:trinci/release/trinci_new
