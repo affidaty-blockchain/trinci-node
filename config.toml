@@ -16,7 +16,7 @@ log-level = "debug"
 
 # Node keypair file.
 # Default: dynamically generated
-keypair-path = "data/ed25519_keypair.bin"
+#keypair-path = "data/ed25519_keypair.bin"
 
 # Node bootstrap file in WASM format.
 # Default: "data/bootstrap.wasm"
@@ -44,7 +44,11 @@ bridge-port = 8001
 
 # P2P service address.
 # Default: 127.0.0.1
-p2p-addr = "0.0.0.0"
+p2p-addr = "127.0.0.1"
+
+# P2P service port.
+# Default: 0 (random)
+p2p-port = 9000
 
 # Max number of transactions per block.
 # Default: 42

@@ -151,6 +151,7 @@ impl App {
         let p2p_config = PeerConfig {
             keypair,
             addr: config.p2p_addr.clone(),
+            port: config.p2p_port,
             network: config.network.clone(),
             bootstrap_addr: config.p2p_bootstrap_addr.clone(),
         };

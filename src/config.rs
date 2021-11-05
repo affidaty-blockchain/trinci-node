@@ -58,6 +58,9 @@ pub const DEFAULT_BRIDGE_PORT: u16 = 8001;
 /// Default p2p service binding address.
 pub const DEFAULT_P2P_ADDR: &str = "127.0.0.1";
 
+/// Default p2p service binding port.
+pub const DEFAULT_P2P_PORT: u16 = 0;
+
 /// Default database path.
 pub const DEFAULT_DB_PATH: &str = "db";
 
@@ -83,14 +86,16 @@ pub struct Config {
     pub block_timeout: u16,
     /// Http service address.
     pub rest_addr: String,
-    /// Http service port.
+    /// Http service tcp port.
     pub rest_port: u16,
     /// Bridge service address.
     pub bridge_addr: String,
-    /// Bridge service port.
+    /// Bridge service tcp port.
     pub bridge_port: u16,
-    /// P2P service address.
+    /// P2P service ip address.
     pub p2p_addr: String,
+    /// P2p service tcp port.
+    pub p2p_port: u16,
     /// P2P service bootstrap address.
     pub p2p_bootstrap_addr: Option<String>,
     /// Blockchain database folder path.
@@ -115,6 +120,7 @@ impl Default for Config {
             bridge_addr: DEFAULT_BRIDGE_ADDR.to_string(),
             bridge_port: DEFAULT_BRIDGE_PORT,
             p2p_addr: DEFAULT_P2P_ADDR.to_string(),
+            p2p_port: DEFAULT_P2P_PORT,
             p2p_bootstrap_addr: None,
             db_path: DEFAULT_DB_PATH.to_string(),
             bootstrap_path: DEFAULT_BOOTSTRAP_PATH.to_string(),
@@ -169,6 +175,9 @@ impl Config {
         }
         if let Some(value) = map.get("p2p-addr").and_then(|value| value.as_str()) {
             config.p2p_addr = value.to_owned();
+        }
+        if let Some(value) = map.get("p2p-port").and_then(|value| value.as_integer()) {
+            config.p2p_port = value as u16;
         }
         if let Some(value) = map
             .get("p2p-bootstrap-addr")
@@ -286,8 +295,15 @@ pub fn create_app_config() -> Config {
         .arg(
             clap::Arg::with_name("p2p-addr")
                 .long("p2p-addr")
-                .help("Peer2Peer service binding address (default '127.0.0.1')")
+                .help("P2P service binding address (default '127.0.0.1')")
                 .value_name("ADDRESS")
+                .required(false),
+        )
+        .arg(
+            clap::Arg::with_name("p2p-port")
+                .long("p2p-port")
+                .help("P2P service listening port (default '0')")
+                .value_name("PORT")
                 .required(false),
         )
         .arg(
@@ -339,6 +355,12 @@ pub fn create_app_config() -> Config {
     if let Some(value) = matches.value_of("p2p-addr") {
         config.p2p_addr = value.to_owned();
     }
+    if let Some(value) = matches
+        .value_of("p2p-port")
+        .and_then(|value| value.parse::<u16>().ok())
+    {
+        config.p2p_port = value;
+    }
     if let Some(value) = matches.value_of("p2p-bootstrap-addr") {
         config.p2p_bootstrap_addr = Some(value.to_owned());
     }
@@ -366,6 +388,7 @@ mod tests {
                 bridge-addr = '{}'\n\
                 bridge-port = {}\n\
                 p2p-addr = '{}'\n\
+                p2p-port = '{}'\n\
                 p2p-bootstrap-addr = '{}'\n\
                 db-path = '{}'\n\
                 bootstrap-path = '{}'\n\
@@ -380,6 +403,7 @@ mod tests {
                 self.bridge_addr,
                 self.bridge_port,
                 self.p2p_addr,
+                self.p2p_port,
                 self.p2p_bootstrap_addr.clone().unwrap_or_default(),
                 self.db_path,
                 self.bootstrap_path,
@@ -401,6 +425,7 @@ mod tests {
             bridge_addr: "5.6.7.8".to_string(),
             bridge_port: 987,
             p2p_addr: "9.1.2.3".to_string(),
+            p2p_port: 0,
             p2p_bootstrap_addr: Some("1.0.0.3".to_string()),
             db_path: "dummy/db/path".to_string(),
             bootstrap_path: "dummy/boot/path".to_string(),
