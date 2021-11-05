@@ -39,6 +39,8 @@ pub struct App {
     pub p2p_svc: PeerService,
     /// Bridge service context.
     pub bridge_svc: BridgeService,
+    /// Keypair placeholder.
+    pub keypair: Option<KeyPair>,
 }
 
 // If this panics, it panics early at node boot. Not a big deal.
@@ -149,7 +151,6 @@ impl App {
         let rest_svc = RestService::new(rest_config, chan.clone());
 
         let p2p_config = PeerConfig {
-            keypair,
             addr: config.p2p_addr.clone(),
             port: config.p2p_port,
             network: config.network.clone(),
@@ -168,6 +169,7 @@ impl App {
             rest_svc,
             p2p_svc,
             bridge_svc,
+            keypair,
         }
     }
 
