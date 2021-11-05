@@ -40,7 +40,7 @@ pub struct App {
     /// Bridge service context.
     pub bridge_svc: BridgeService,
     /// Keypair placeholder.
-    pub keypair: Option<KeyPair>,
+    pub keypair: KeyPair,
 }
 
 // If this panics, it panics early at node boot. Not a big deal.
@@ -130,7 +130,7 @@ fn bootstrap_monitor(chan: BlockRequestSender, wm: Arc<Mutex<WmLocal>>) {
 
 impl App {
     /// Create a new Application instance.
-    pub fn new(config: Config, keypair: Option<KeyPair>) -> Self {
+    pub fn new(config: Config, keypair: KeyPair) -> Self {
         let bootstrap_loader = bootstrap_loader(config.bootstrap_path.clone());
         let wm = WmLocal::new(bootstrap_loader, config.wm_cache_max);
         let db = RocksDb::new(&config.db_path);

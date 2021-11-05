@@ -96,11 +96,10 @@ fn main() {
 
     show_config(&config);
 
-    let keypair = config.keypair_path.clone().map(|filename| {
-        let keypair = utils::load_ed25519_keypair(&filename).expect("loading keypair");
-        info!("Node ID: {}", keypair.public_key().to_account_id());
-        keypair
-    });
+    let filename = config.keypair_path.clone();
+    let keypair = utils::load_keypair(filename).expect("keypair generation fail");
+
+    info!("Node ID: {}", keypair.public_key().to_account_id());
 
     let mut app = App::new(config, keypair);
     app.start();

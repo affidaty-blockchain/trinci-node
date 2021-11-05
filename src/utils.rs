@@ -17,18 +17,29 @@
 
 use std::io::Read;
 use trinci_core::{
-    crypto::{ed25519, KeyPair},
+    crypto::{ecdsa, ed25519, KeyPair},
     Error, ErrorKind, Result,
 };
 
 /// Load node account keypair.
-pub fn load_ed25519_keypair(filename: &str) -> Result<KeyPair> {
-    info!("Loading node keys from: {}", filename);
-    let mut file = std::fs::File::open(filename)
-        .map_err(|err| Error::new_ext(ErrorKind::MalformedData, err))?;
-    let mut bytes = Vec::new();
-    file.read_to_end(&mut bytes).expect("loading node keypair");
-
-    let keypair = ed25519::KeyPair::from_bytes(&bytes)?;
-    Ok(KeyPair::Ed25519(keypair))
+pub fn load_keypair(filename: Option<String>) -> Result<KeyPair> {
+    match filename {
+        Some(filename) => {
+            info!("Loading node keys from: {}", filename);
+            let ecdsa = if filename.contains("/tpm") {
+                ecdsa::KeyPair::new_tpm2(ecdsa::CurveId::Secp256R1, filename.as_str())?
+            } else {
+                let mut file = std::fs::File::open(filename)
+                    .map_err(|err| Error::new_ext(ErrorKind::MalformedData, err))?;
+                let mut bytes = Vec::new();
+                file.read_to_end(&mut bytes).expect("loading node keypair");
+                ecdsa::KeyPair::from_pkcs8_bytes(ecdsa::CurveId::Secp256R1, &bytes)?
+            };
+            Ok(KeyPair::Ecdsa(ecdsa))
+        }
+        None => {
+            let ed25519 = ed25519::KeyPair::from_random();
+            Ok(KeyPair::Ed25519(ed25519))
+        }
+    }
 }
