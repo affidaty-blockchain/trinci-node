@@ -1,8 +1,8 @@
 [package]
 name = "trinci-node"
-version = "0.2.2"
+version = "0.2.3-rc1"
 authors = ["The Trinci Team <trinci@affidaty.io>"]
-edition = "2018"
+edition = "2021"
 description = "TRINCI blockchain node"
 keywords = ["trinci", "blockchain", "node"]
 
