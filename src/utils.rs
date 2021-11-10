@@ -28,10 +28,11 @@ pub fn load_keypair(filename: Option<String>) -> Result<KeyPair> {
             info!("Loading node keys from: {}", filename);
             let ecdsa = if filename.contains("/tpm") {
                 #[cfg(feature = "tpm2")]
-                ecdsa::KeyPair::new_tpm2(ecdsa::CurveId::Secp256R1, filename.as_str())?
+                ecdsa::KeyPair::new_tpm2(ecdsa::CurveId::Secp256R1, filename.as_str())?;
                 #[cfg(not(feature = "tpm2"))]
-                panic!("TPM2 feature not included, for using tpm2 module compile with feature=tpm2");
-                
+                panic!(
+                    "TPM2 feature not included, for using tpm2 module compile with feature=tpm2"
+                );
             } else {
                 let mut file = std::fs::File::open(filename)
                     .map_err(|err| Error::new_ext(ErrorKind::MalformedData, err))?;
