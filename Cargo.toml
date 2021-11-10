@@ -16,3 +16,6 @@ hex = "0.4.3"
 serde-value = { git = "https://github.com/affidaty-blockchain/serde-value", branch = "helper_macro" }
 rand = "0.8.4"
 tempfile = "3.2.0"
+
+[features]
+tpm2 = ["trinci-core/tpm2"]
