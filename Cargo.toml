@@ -7,7 +7,8 @@ description = "TRINCI blockchain node"
 keywords = ["trinci", "blockchain", "node"]
 
 [dependencies]
-trinci-core = { git = "https://github.com/affidaty-blockchain/trinci-core" }
+#trinci-core = { git = "https://github.com/affidaty-blockchain/trinci-core" }
+trinci-core = { path = "../trinci-core" }
 log = { version = "0.4.14", features = [ "release_max_level_info" ] }
 clap = "2.33.3"
 toml = "0.5.8"
@@ -16,6 +17,13 @@ hex = "0.4.3"
 serde-value = { git = "https://github.com/affidaty-blockchain/serde-value", branch = "helper_macro" }
 rand = "0.8.4"
 tempfile = "3.2.0"
+# Serialization 
+serde = { version = "1.0.126", features = [ "derive" ] }
+serde_json = "1.0"
+# POST
+isahc = "1.6.0"
+# pretty print on file
+ascii_table = "3.0.2"
 
 [features]
 tpm2 = ["trinci-core/tpm2"]

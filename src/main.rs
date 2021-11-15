@@ -23,6 +23,9 @@ mod config;
 mod tracer;
 mod utils;
 
+// TODO: should be conditional impl
+mod monitor;
+
 use crate::app::App;
 use config::Config;
 use log::LevelFilter;
