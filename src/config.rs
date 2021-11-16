@@ -67,6 +67,12 @@ pub const DEFAULT_DB_PATH: &str = "db";
 /// Default smart contracts cache size.
 pub const DEFAULT_WM_CACHE_MAX: usize = 10;
 
+/// Default monitor file.
+pub const DEFAULT_MONITOR_FILE: &str = "blackbox.info";
+
+/// Default monitor addr.
+pub const DEFAULT_MONITOR_ADDR: Option<String> = None;
+
 /// Core configuration structure.
 #[derive(PartialEq, Debug, Clone)]
 pub struct Config {
@@ -104,6 +110,10 @@ pub struct Config {
     pub bootstrap_path: String,
     /// WASM machine max cache size.
     pub wm_cache_max: usize,
+    /// monitor file
+    pub monitor_file: String,
+    /// monitor addr
+    pub monitor_addr: Option<String>,
 }
 
 impl Default for Config {
@@ -125,6 +135,8 @@ impl Default for Config {
             db_path: DEFAULT_DB_PATH.to_string(),
             bootstrap_path: DEFAULT_BOOTSTRAP_PATH.to_string(),
             wm_cache_max: DEFAULT_WM_CACHE_MAX,
+            monitor_file: DEFAULT_MONITOR_FILE.to_string(),
+            monitor_addr: DEFAULT_MONITOR_ADDR,
         }
     }
 }
@@ -309,7 +321,21 @@ pub fn create_app_config() -> Config {
         .arg(
             clap::Arg::with_name("p2p-bootstrap-addr")
                 .long("p2p-bootstrap-addr")
-                .help("Peer2Peer service bootstrap address (default '127.0.0.1')")
+                .help("peer2peer service bootstrap address (default '127.0.0.1')")
+                .value_name("ADDRESS")
+                .required(false),
+        )
+        .arg(
+            clap::Arg::with_name("monitor-file")
+                .long("monitor-file")
+                .help("monitor file location (default 'blackbox.info')")
+                .value_name("PATH")
+                .required(false),
+        )
+        .arg(
+            clap::Arg::with_name("monitor-addr")
+                .long("monitor-address")
+                .help("monitor addres to send POST req (default 'None')")
                 .value_name("ADDRESS")
                 .required(false),
         )
@@ -363,6 +389,12 @@ pub fn create_app_config() -> Config {
     }
     if let Some(value) = matches.value_of("p2p-bootstrap-addr") {
         config.p2p_bootstrap_addr = Some(value.to_owned());
+    }
+    if let Some(value) = matches.value_of("monitor-file") {
+        config.monitor_file = value.to_owned();
+    }
+    if let Some(value) = matches.value_of("monitor-addr") {
+        config.monitor_addr = Some(value.to_owned());
     }
     config
 }
@@ -430,6 +462,8 @@ mod tests {
             db_path: "dummy/db/path".to_string(),
             bootstrap_path: "dummy/boot/path".to_string(),
             wm_cache_max: 42,
+            monitor_file: "dummy_blackbox.info".to_string(),
+            monitor_addr: None,
         }
     }
 

@@ -18,12 +18,13 @@ serde-value = { git = "https://github.com/affidaty-blockchain/serde-value", bran
 rand = "0.8.4"
 tempfile = "3.2.0"
 # Serialization 
-serde = { version = "1.0.126", features = [ "derive" ] }
-serde_json = "1.0"
+serde = { version = "1.0.126", features = [ "derive" ], optional = true}
+serde_json = { version = "1.0", optional = true }
 # POST
-isahc = "1.6.0"
+isahc = { version = "1.6.0", optional = true }
 # pretty print on file
-ascii_table = "3.0.2"
+ascii_table = { version = "3.0.2", optional = true }
 
 [features]
 tpm2 = ["trinci-core/tpm2"]
+monitor = ["serde", "serde_json", "isahc", "ascii_table"]
