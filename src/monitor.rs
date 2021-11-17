@@ -193,7 +193,7 @@ fn save_update(monitor: &mut Monitor, file: &String) {
     file.write_all(monitor.node_id.as_bytes())
         .is_err()
         .then(|| warn!("[monitor] error in file write"));
-    file.write_all(b"\nnode info\n")
+    file.write_all(b"\n\nnode info\n")
         .is_err()
         .then(|| warn!("[monitor] error in file write"));
     file.write_all(ascii_table.format(data).as_bytes())
@@ -296,7 +296,27 @@ fn save_update(monitor: &mut Monitor, file: &String) {
                 .then(|| warn!("[monitor] error in file write"));
         }
         None => {
-            file.write_all(b"None")
+            file.write_all(b"None\n")
+                .is_err()
+                .then(|| warn!("[monitor] error in file write"));
+        }
+    }
+    // ----------------------
+    // unconfirmed pool handling
+    file.write_all(b"\nunconfirmed pool\n")
+        .is_err()
+        .then(|| warn!("[monitor] error in file write"));
+    match &monitor.node_status.unconfirmed_pool {
+        Some(pool) => {
+            let hash = hex::encode(pool.hash.hash_value());
+            let pool_data: Vec<Vec<&dyn Display>> =
+                vec![vec![&"hash", &hash], vec![&"lenght", &pool.size]];
+            file.write_all(ascii_table.format(pool_data).as_bytes())
+                .is_err()
+                .then(|| warn!("[monitor] error in file write"));
+        }
+        None => {
+            file.write_all(b"None\n")
                 .is_err()
                 .then(|| warn!("[monitor] error in file write"));
         }
