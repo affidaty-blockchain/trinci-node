@@ -7,8 +7,7 @@ description = "TRINCI blockchain node"
 keywords = ["trinci", "blockchain", "node"]
 
 [dependencies]
-#trinci-core = { git = "https://github.com/affidaty-blockchain/trinci-core" }
-trinci-core = { path = "../trinci-core" }
+trinci-core = { git = "https://github.com/affidaty-blockchain/trinci-core" }
 log = { version = "0.4.14", features = [ "release_max_level_info" ] }
 clap = "2.33.3"
 toml = "0.5.8"
