@@ -462,7 +462,7 @@ mod tests {
             db_path: "dummy/db/path".to_string(),
             bootstrap_path: "dummy/boot/path".to_string(),
             wm_cache_max: 42,
-            monitor_file: "dummy_blackbox.info".to_string(),
+            monitor_file: "blackbox.info".to_string(),
             monitor_addr: None,
         }
     }
