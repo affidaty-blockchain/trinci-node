@@ -21,14 +21,13 @@ use trinci_core::{
     base::Mutex,
     blockchain::{BlockConfig, BlockRequestSender, BlockService, Event, Message},
     bridge::{BridgeConfig, BridgeService},
-    crypto::KeyPair,
+    crypto::{ed25519::KeyPair as ed25519KeyPair, ed25519::PublicKey, KeyPair},
     db::RocksDb,
     p2p::{service::PeerConfig, PeerService},
     rest::{RestConfig, RestService},
     wm::{WasmLoader, WmLocal},
     Error, ErrorKind,
 };
-
 /// Application context.
 pub struct App {
     /// Block service context.
@@ -41,6 +40,8 @@ pub struct App {
     pub bridge_svc: BridgeService,
     /// Keypair placeholder.
     pub keypair: KeyPair,
+    /// p2p Keypair placeholder
+    pub p2p_public_key: PublicKey,
 }
 
 // If this panics, it panics early at node boot. Not a big deal.
@@ -150,11 +151,15 @@ impl App {
         };
         let rest_svc = RestService::new(rest_config, chan.clone());
 
+        let p2p_keypair = ed25519KeyPair::from_random();
+        let p2p_public_key = p2p_keypair.public_key();
+
         let p2p_config = PeerConfig {
             addr: config.p2p_addr.clone(),
             port: config.p2p_port,
             network: config.network.clone(),
             bootstrap_addr: config.p2p_bootstrap_addr.clone(),
+            p2p_keypair: Some(p2p_keypair),
         };
         let p2p_svc = PeerService::new(p2p_config, chan.clone());
 
@@ -170,6 +175,7 @@ impl App {
             p2p_svc,
             bridge_svc,
             keypair,
+            p2p_public_key,
         }
     }
 
