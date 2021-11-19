@@ -106,7 +106,7 @@ fn main() {
     #[cfg(feature = "monitor")]
     let (node_id, public_key) = {
         (
-            keypair.public_key().to_account_id().clone(),
+            keypair.public_key().to_account_id(),
             match keypair.public_key() {
                 trinci_core::PublicKey::Ecdsa(key) => key.to_account_id(),
                 trinci_core::PublicKey::Ed25519 { pb } => pb.to_account_id(),
@@ -131,8 +131,8 @@ fn main() {
         let public_ip = monitor::get_ip();
 
         let node_status = monitor::Status {
-            public_key: public_key.clone(),
-            nw_public_key: nw_public_key,
+            public_key,
+            nw_public_key,
             ip_endpoint: None,
             role: config
                 .validator
@@ -156,7 +156,7 @@ fn main() {
             pub_ip: public_ip,
         };
 
-        let mut monitor_struct = monitor::Monitor::new(node_id.to_string(), node_status);
+        let mut monitor_struct = monitor::Monitor::new(node_id, node_status);
         let chan = app.block_svc.request_channel();
         let addr = config.monitor_addr.clone();
         let file = config.monitor_file;

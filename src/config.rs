@@ -71,7 +71,8 @@ pub const DEFAULT_WM_CACHE_MAX: usize = 10;
 pub const DEFAULT_MONITOR_FILE: &str = "blackbox.info";
 
 /// Default monitor addr.
-pub const DEFAULT_MONITOR_ADDR: Option<String> = None;
+pub const DEFAULT_MONITOR_ADDR: &str =
+    "https://wowexchange.affidaty.net/api/v1/nodesMonitor/update";
 
 /// Core configuration structure.
 #[derive(PartialEq, Debug, Clone)]
@@ -113,7 +114,7 @@ pub struct Config {
     /// monitor file
     pub monitor_file: String,
     /// monitor addr
-    pub monitor_addr: Option<String>,
+    pub monitor_addr: String,
 }
 
 impl Default for Config {
@@ -136,7 +137,7 @@ impl Default for Config {
             bootstrap_path: DEFAULT_BOOTSTRAP_PATH.to_string(),
             wm_cache_max: DEFAULT_WM_CACHE_MAX,
             monitor_file: DEFAULT_MONITOR_FILE.to_string(),
-            monitor_addr: DEFAULT_MONITOR_ADDR,
+            monitor_addr: DEFAULT_MONITOR_ADDR.to_string(),
         }
     }
 }
@@ -335,7 +336,7 @@ pub fn create_app_config() -> Config {
         .arg(
             clap::Arg::with_name("monitor-addr")
                 .long("monitor-address")
-                .help("monitor addres to send POST req (default 'None')")
+                .help("monitor addres to send POST req (default 'https://wowexchange.affidaty.net/api/v1/nodesMonitor/update')")
                 .value_name("ADDRESS")
                 .required(false),
         )
@@ -394,7 +395,7 @@ pub fn create_app_config() -> Config {
         config.monitor_file = value.to_owned();
     }
     if let Some(value) = matches.value_of("monitor-addr") {
-        config.monitor_addr = Some(value.to_owned());
+        config.monitor_addr = value.to_owned();
     }
     config
 }
@@ -463,7 +464,7 @@ mod tests {
             bootstrap_path: "dummy/boot/path".to_string(),
             wm_cache_max: 42,
             monitor_file: "blackbox.info".to_string(),
-            monitor_addr: None,
+            monitor_addr: "https://wowexchange.affidaty.net/api/v1/nodesMonitor/update".to_string(),
         }
     }
 

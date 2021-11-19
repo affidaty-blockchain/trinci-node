@@ -26,10 +26,9 @@
 use ascii_table::{Align, AsciiTable, Column};
 use isahc::{Request, RequestExt};
 use serde::Serialize;
-use serde_json;
 use std::{
-    fmt::Display, fs::File, io::Write, process::Command, str::from_utf8, thread::sleep,
-    time::Duration,
+    collections::BTreeMap, fmt::Display, fs::File, io::Write, process::Command, str::from_utf8,
+    thread::sleep, time::Duration,
 };
 #[cfg(feature = "monitor")]
 use trinci_core::{
@@ -103,13 +102,17 @@ pub struct Status {
     //rcv_message_in_window: T,
 }
 
+// due to server interaction the Monitor server
+// structure needs this names as field
 #[derive(Serialize)]
+#[allow(non_snake_case)]
 pub struct Monitor {
     nodeID: String,
     data: Status,
 }
 
 impl Monitor {
+    #[allow(non_snake_case)]
     pub fn new(nodeID: String, data: Status) -> Monitor {
         Monitor { nodeID, data }
     }
@@ -118,18 +121,15 @@ impl Monitor {
     fn update(&mut self, block: Option<Block>, unconfirmed_pool: Option<UnconfirmedPool>) {
         self.data.unconfirmed_pool = unconfirmed_pool;
 
-        match block {
-            Some(block) => {
-                let hash = block.hash(HashAlgorithm::Sha256);
-                let last_block = LastBlock { block, hash };
-                self.data.last_block = Some(last_block);
-            }
-            None => {}
+        if let Some(block) = block {
+            let hash = block.hash(HashAlgorithm::Sha256);
+            let last_block = LastBlock { block, hash };
+            self.data.last_block = Some(last_block);
         }
     }
 }
 
-fn send_update(monitor: &mut Monitor, addr: &String) {
+fn send_update(monitor: &mut Monitor, addr: &str) {
     let request = match serde_json::to_string(&monitor) {
         Ok(request) => request,
         Err(_error) => {
@@ -157,20 +157,26 @@ fn send_update(monitor: &mut Monitor, addr: &String) {
     }
 }
 
-fn save_update(monitor: &mut Monitor, file: &String) {
+fn save_update(monitor: &mut Monitor, file: &str) {
     // write structure in file
-    let mut ascii_table = AsciiTable::default();
+    let mut columns = BTreeMap::new();
+    let column_field = Column {
+        header: "field".into(),
+        align: Align::Left,
+        max_width: 100,
+    };
+    let column_vals = Column {
+        header: "value".into(),
+        align: Align::Center,
+        max_width: 100,
+    };
+    columns.insert(0, column_field);
+    columns.insert(1, column_vals);
+    let mut ascii_table = AsciiTable {
+        max_width: 100,
+        columns,
+    };
     ascii_table.max_width = 100;
-
-    let mut column = Column::default();
-    column.header = "field".into();
-    column.align = Align::Left;
-    ascii_table.columns.insert(0, column);
-
-    let mut column = Column::default();
-    column.header = "value".into();
-    column.align = Align::Center;
-    ascii_table.columns.insert(1, column);
 
     // data preparation
     let role = match &monitor.data.role {
@@ -180,7 +186,7 @@ fn save_update(monitor: &mut Monitor, file: &String) {
 
     let ip_endpoint = match &monitor.data.ip_endpoint {
         Some(ip) => ip.clone(),
-        None => String::from("None").clone(),
+        None => String::from("None"),
     };
 
     let data: Vec<Vec<&dyn Display>> = vec![
@@ -233,7 +239,7 @@ fn save_update(monitor: &mut Monitor, file: &String) {
     // data preparation
     let bootstrap_addr = match &monitor.data.p2p_info.p2p_bootstrap_addr {
         Some(addr) => addr.clone(),
-        None => String::from("None").clone(),
+        None => String::from("None"),
     };
 
     let p2p_data: Vec<Vec<&dyn Display>> = vec![
@@ -256,30 +262,11 @@ fn save_update(monitor: &mut Monitor, file: &String) {
     match &monitor.data.last_block {
         Some(last_block) => {
             // data preparation
-            let last_block_hash = match from_utf8(last_block.hash.as_bytes()) {
-                Ok(str) => str,
-                Err(_) => "None",
-            };
-
-            let prev_hash = match from_utf8(last_block.block.prev_hash.as_bytes()) {
-                Ok(str) => str,
-                Err(_) => "None",
-            };
-
-            let txs_hash = match from_utf8(last_block.block.txs_hash.as_bytes()) {
-                Ok(str) => str,
-                Err(_) => "None",
-            };
-
-            let rxs_hash = match from_utf8(last_block.block.rxs_hash.as_bytes()) {
-                Ok(str) => str,
-                Err(_) => "None",
-            };
-
-            let state_hash = match from_utf8(last_block.block.state_hash.as_bytes()) {
-                Ok(str) => str,
-                Err(_) => "None",
-            };
+            let last_block_hash = from_utf8(last_block.hash.as_bytes()).unwrap_or("None");
+            let prev_hash = from_utf8(last_block.block.prev_hash.as_bytes()).unwrap_or("None");
+            let txs_hash = from_utf8(last_block.block.txs_hash.as_bytes()).unwrap_or("None");
+            let rxs_hash = from_utf8(last_block.block.rxs_hash.as_bytes()).unwrap_or("None");
+            let state_hash = from_utf8(last_block.block.state_hash.as_bytes()).unwrap_or("None");
 
             let block_data: Vec<Vec<&dyn Display>> = vec![
                 vec![&"hash", &last_block_hash],
@@ -320,15 +307,11 @@ fn save_update(monitor: &mut Monitor, file: &String) {
                 .then(|| warn!("[monitor] error in file write"));
         }
     }
+    debug!("[monitor] update saved");
 }
 
-pub fn run(
-    monitor: &mut Monitor,
-    tx_chan: BlockRequestSender,
-    addr: &Option<String>,
-    file: &String,
-) {
-    debug!("[monitor] running, waiting 5 minutes for first run!");
+pub fn run(monitor: &mut Monitor, tx_chan: BlockRequestSender, addr: &str, file: &str) {
+    debug!("[monitor] running, monitor data updated every 5 min");
 
     loop {
         sleep(Duration::new(60 * 5, 0));
@@ -354,15 +337,8 @@ pub fn run(
                     monitor.update(info.2, None)
                 }
 
-                match addr {
-                    Some(addr) => {
-                        send_update(monitor, &addr);
-                        //debug!("[monitor] update sended");
-                    }
-                    None => {}
-                }
-                save_update(monitor, &file);
-                debug!("[monitor] update saved");
+                send_update(monitor, addr);
+                save_update(monitor, file);
             }
             Ok(res) => {
                 warn!("[monitor] unexpected message {:?}", res);
@@ -376,7 +352,6 @@ pub fn run(
 }
 
 pub fn get_ip() -> String {
-    //FROM Luca with Love
     let mut dig = Command::new("sh");
     dig.arg("-c")
         .arg("dig TXT +short o-o.myaddr.l.google.com @ns1.google.com");
