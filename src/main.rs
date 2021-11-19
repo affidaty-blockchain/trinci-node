@@ -26,7 +26,7 @@ mod utils;
 #[cfg(feature = "monitor")]
 mod monitor;
 
-use crate::{app::App};
+use crate::app::App;
 use config::Config;
 use log::LevelFilter;
 use simplelog::{ColorChoice, TermLogger, TerminalMode};
