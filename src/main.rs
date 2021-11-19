@@ -26,7 +26,7 @@ mod utils;
 #[cfg(feature = "monitor")]
 mod monitor;
 
-use crate::app::App;
+use crate::{app::App};
 use config::Config;
 use log::LevelFilter;
 use simplelog::{ColorChoice, TermLogger, TerminalMode};
@@ -128,6 +128,7 @@ fn main() {
         let config = config::create_app_config();
 
         let nw_public_key = app.p2p_public_key.to_account_id();
+        let public_ip = monitor::get_ip();
 
         let node_status = monitor::Status {
             public_key: public_key.clone(),
@@ -152,6 +153,7 @@ fn main() {
                 p2p_port: config.p2p_port,
                 p2p_bootstrap_addr: config.p2p_bootstrap_addr,
             },
+            pub_ip: public_ip,
         };
 
         let mut monitor_struct = monitor::Monitor::new(node_id.to_string(), node_status);

@@ -27,7 +27,7 @@ use ascii_table::{Align, AsciiTable, Column};
 use isahc::{Request, RequestExt};
 use serde::Serialize;
 use serde_json;
-use std::{fmt::Display, fs::File, io::Write, str::from_utf8, thread::sleep, time::Duration};
+use std::{fmt::Display, fs::File, io::Write, str::from_utf8, thread::sleep, time::Duration, process::Command};
 #[cfg(feature = "monitor")]
 use trinci_core::{
     blockchain::BlockRequestSender,
@@ -82,6 +82,8 @@ pub struct Status {
     pub nw_public_key: String,
     /// ip entry point to contact the node
     pub ip_endpoint: Option<String>,
+    /// ip seen from the extern
+    pub pub_ip: String,
     /// node's role
     pub role: NodeRole,
     /// partial netowrk config that reside in the bootstrap
@@ -181,6 +183,7 @@ fn save_update(monitor: &mut Monitor, file: &String) {
     let data: Vec<Vec<&dyn Display>> = vec![
         vec![&"public key", &monitor.data.public_key],
         vec![&"network public key", &monitor.data.nw_public_key],
+        vec![&"piublic IP", &monitor.data.pub_ip],
         vec![&"IP end point", &ip_endpoint],
         vec![&"role", &role],
         vec![&"core version", &monitor.data.core_version],
@@ -367,4 +370,17 @@ pub fn run(
             }
         }
     }
+}
+
+pub fn get_ip() -> String {
+     //FROM Luca with Love
+     let mut dig =  Command::new("sh");
+     dig.arg("-c").arg("dig TXT +short o-o.myaddr.l.google.com @ns1.google.com");
+     let my_public_ip = dig.output().expect("failed to execute process");
+     let my_public_ip = String::from_utf8_lossy(&my_public_ip.stdout);
+     // remove " 
+     let mut chars = my_public_ip.trim().chars();
+     chars.next();
+     chars.next_back();
+     chars.as_str().to_string()
 }
