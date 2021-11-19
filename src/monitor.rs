@@ -100,27 +100,24 @@ pub struct Status {
 
 #[derive(Serialize)]
 pub struct Monitor {
-    node_id: String,
-    node_status: Status,
+    nodeID: String,
+    data: Status,
 }
 
 impl Monitor {
-    pub fn new(node_id: String, node_status: Status) -> Monitor {
-        Monitor {
-            node_id,
-            node_status,
-        }
+    pub fn new(nodeID: String, data: Status) -> Monitor {
+        Monitor { nodeID, data }
     }
 
     // function to update node status
     fn update(&mut self, block: Option<Block>, unconfirmed_pool: Option<UnconfirmedPool>) {
-        self.node_status.unconfirmed_pool = unconfirmed_pool;
+        self.data.unconfirmed_pool = unconfirmed_pool;
 
         match block {
             Some(block) => {
                 let hash = block.hash(HashAlgorithm::Sha256);
                 let last_block = LastBlock { block, hash };
-                self.node_status.last_block = Some(last_block);
+                self.data.last_block = Some(last_block);
             }
             None => {}
         }
@@ -128,13 +125,15 @@ impl Monitor {
 }
 
 fn send_update(monitor: &mut Monitor, addr: &String) {
-    let request = match serde_json::to_vec(&monitor) {
+    let request = match serde_json::to_string(&monitor) {
         Ok(request) => request,
         Err(_error) => {
             warn!("[monitor] error in serializing monitor structure");
             return;
         }
     };
+
+    debug!("{}", request);
 
     let response = match Request::post(addr)
         .header("content-type", "application/json")
@@ -148,7 +147,7 @@ fn send_update(monitor: &mut Monitor, addr: &String) {
     };
 
     match response.send() {
-        Ok(_) => println!("update sended"),
+        Ok(response) => debug!("[monitor] update sended {:?}", response.body()),
         Err(error) => warn!("[monitor] {:?}", error),
     }
 }
@@ -169,28 +168,28 @@ fn save_update(monitor: &mut Monitor, file: &String) {
     ascii_table.columns.insert(1, column);
 
     // data preparation
-    let role = match &monitor.node_status.role {
+    let role = match &monitor.data.role {
         NodeRole::Ordinary => "ordinary",
         NodeRole::Validator => "validator",
     };
 
-    let ip_endpoint = match &monitor.node_status.ip_endpoint {
+    let ip_endpoint = match &monitor.data.ip_endpoint {
         Some(ip) => ip.clone(),
         None => String::from("None").clone(),
     };
 
     let data: Vec<Vec<&dyn Display>> = vec![
-        vec![&"public key", &monitor.node_status.public_key],
-        vec![&"network public key", &monitor.node_status.nw_public_key],
+        vec![&"public key", &monitor.data.public_key],
+        vec![&"network public key", &monitor.data.nw_public_key],
         vec![&"IP end point", &ip_endpoint],
         vec![&"role", &role],
-        vec![&"core version", &monitor.node_status.core_version],
+        vec![&"core version", &monitor.data.core_version],
     ];
     let mut file = File::create(file).unwrap();
     file.write_all(b"\nnode id:\n")
         .is_err()
         .then(|| warn!("[monitor] error in file write"));
-    file.write_all(monitor.node_id.as_bytes())
+    file.write_all(monitor.nodeID.as_bytes())
         .is_err()
         .then(|| warn!("[monitor] error in file write"));
     file.write_all(b"\n\nnode info\n")
@@ -210,16 +209,10 @@ fn save_update(monitor: &mut Monitor, file: &String) {
     //};
 
     let network_data: Vec<Vec<&dyn Display>> = vec![
-        vec![&"network name", &monitor.node_status.nw_config.name],
+        vec![&"network name", &monitor.data.nw_config.name],
         //vec![&"network id", &network_id], todo!()
-        vec![
-            &"block threshold",
-            &monitor.node_status.nw_config.block_threshold,
-        ],
-        vec![
-            &"block timeout",
-            &monitor.node_status.nw_config.block_timeout,
-        ],
+        vec![&"block threshold", &monitor.data.nw_config.block_threshold],
+        vec![&"block timeout", &monitor.data.nw_config.block_timeout],
     ];
     file.write_all(b"\nnetwork info\n")
         .is_err()
@@ -232,14 +225,14 @@ fn save_update(monitor: &mut Monitor, file: &String) {
     // p2p data handling
 
     // data preparation
-    let bootstrap_addr = match &monitor.node_status.p2p_info.p2p_bootstrap_addr {
+    let bootstrap_addr = match &monitor.data.p2p_info.p2p_bootstrap_addr {
         Some(addr) => addr.clone(),
         None => String::from("None").clone(),
     };
 
     let p2p_data: Vec<Vec<&dyn Display>> = vec![
-        vec![&"p2p address", &monitor.node_status.p2p_info.p2p_addr],
-        vec![&"p2p port", &monitor.node_status.p2p_info.p2p_port],
+        vec![&"p2p address", &monitor.data.p2p_info.p2p_addr],
+        vec![&"p2p port", &monitor.data.p2p_info.p2p_port],
         vec![&"p2p bootsrap address", &bootstrap_addr],
     ];
     file.write_all(b"\np2p info\n")
@@ -254,7 +247,7 @@ fn save_update(monitor: &mut Monitor, file: &String) {
     file.write_all(b"\nlast block\n")
         .is_err()
         .then(|| warn!("[monitor] error in file write"));
-    match &monitor.node_status.last_block {
+    match &monitor.data.last_block {
         Some(last_block) => {
             // data preparation
             let last_block_hash = match from_utf8(last_block.hash.as_bytes()) {
@@ -306,7 +299,7 @@ fn save_update(monitor: &mut Monitor, file: &String) {
     file.write_all(b"\nunconfirmed pool\n")
         .is_err()
         .then(|| warn!("[monitor] error in file write"));
-    match &monitor.node_status.unconfirmed_pool {
+    match &monitor.data.unconfirmed_pool {
         Some(pool) => {
             let hash = hex::encode(pool.hash.hash_value());
             let pool_data: Vec<Vec<&dyn Display>> =
@@ -332,7 +325,7 @@ pub fn run(
     debug!("[monitor] running, waiting 5 minutes for first run!");
 
     loop {
-        sleep(Duration::new(60 * 1, 0));
+        sleep(Duration::new(60 * 5, 0));
 
         let request = Message::GetCoreStatsRequest;
         let rx_chan = match tx_chan.send_sync(request) {
@@ -358,7 +351,7 @@ pub fn run(
                 match addr {
                     Some(addr) => {
                         send_update(monitor, &addr);
-                        debug!("[monitor] update sended");
+                        //debug!("[monitor] update sended");
                     }
                     None => {}
                 }
