@@ -464,7 +464,8 @@ mod tests {
             bootstrap_path: "dummy/boot/path".to_string(),
             wm_cache_max: 42,
             monitor_file: "blackbox.info".to_string(),
-            monitor_addr: "https://dev.exchange.affidaty.net/api/v1/nodesMonitor/update".to_string(),
+            monitor_addr: "https://dev.exchange.affidaty.net/api/v1/nodesMonitor/update"
+                .to_string(),
         }
     }
 
