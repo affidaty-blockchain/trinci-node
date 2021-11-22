@@ -72,7 +72,7 @@ pub const DEFAULT_MONITOR_FILE: &str = "blackbox.info";
 
 /// Default monitor addr.
 pub const DEFAULT_MONITOR_ADDR: &str =
-    "https://wowexchange.affidaty.net/api/v1/nodesMonitor/update";
+    "https://dev.exchange.affidaty.net/api/v1/nodesMonitor/update";
 
 /// Core configuration structure.
 #[derive(PartialEq, Debug, Clone)]
@@ -464,7 +464,7 @@ mod tests {
             bootstrap_path: "dummy/boot/path".to_string(),
             wm_cache_max: 42,
             monitor_file: "blackbox.info".to_string(),
-            monitor_addr: "https://wowexchange.affidaty.net/api/v1/nodesMonitor/update".to_string(),
+            monitor_addr: "https://dev.exchange.affidaty.net/api/v1/nodesMonitor/update".to_string(),
         }
     }
 
