@@ -38,8 +38,6 @@ pub struct App {
     pub p2p_svc: PeerService,
     /// Bridge service context.
     pub bridge_svc: BridgeService,
-    /// Keypair placeholder.
-    pub keypair: KeyPair,
     /// p2p Keypair placeholder
     pub p2p_public_key: PublicKey,
 }
@@ -141,6 +139,7 @@ impl App {
             threshold: config.block_threshold,
             timeout: config.block_timeout,
             network: config.network.clone(),
+            keypair: Arc::new(keypair),
         };
         let block_svc = BlockService::new(block_config, db, wm);
         let chan = block_svc.request_channel();
@@ -174,7 +173,6 @@ impl App {
             rest_svc,
             p2p_svc,
             bridge_svc,
-            keypair,
             p2p_public_key,
         }
     }

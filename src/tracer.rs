@@ -66,7 +66,7 @@ pub fn run(tx_chan: BlockRequestSender) {
     loop {
         match rx_chan.recv_sync() {
             Ok(Message::GetBlockResponse { block, .. }) => {
-                tracer.update(block.height as usize, block.size as usize);
+                tracer.update(block.data.height as usize, block.data.size as usize);
             }
             Ok(res) => {
                 warn!("[tracer] unexpected message {:?}", res);

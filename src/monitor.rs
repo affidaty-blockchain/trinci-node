@@ -263,15 +263,16 @@ fn save_update(monitor: &mut Monitor, file: &str) {
         Some(last_block) => {
             // data preparation
             let last_block_hash = from_utf8(last_block.hash.as_bytes()).unwrap_or("None");
-            let prev_hash = from_utf8(last_block.block.prev_hash.as_bytes()).unwrap_or("None");
-            let txs_hash = from_utf8(last_block.block.txs_hash.as_bytes()).unwrap_or("None");
-            let rxs_hash = from_utf8(last_block.block.rxs_hash.as_bytes()).unwrap_or("None");
-            let state_hash = from_utf8(last_block.block.state_hash.as_bytes()).unwrap_or("None");
+            let prev_hash = from_utf8(last_block.block.data.prev_hash.as_bytes()).unwrap_or("None");
+            let txs_hash = from_utf8(last_block.block.data.txs_hash.as_bytes()).unwrap_or("None");
+            let rxs_hash = from_utf8(last_block.block.data.rxs_hash.as_bytes()).unwrap_or("None");
+            let state_hash =
+                from_utf8(last_block.block.data.state_hash.as_bytes()).unwrap_or("None");
 
             let block_data: Vec<Vec<&dyn Display>> = vec![
                 vec![&"hash", &last_block_hash],
-                vec![&"height", &last_block.block.height],
-                vec![&"size", &last_block.block.size],
+                vec![&"height", &last_block.block.data.height],
+                vec![&"size", &last_block.block.data.size],
                 vec![&"previous hash", &prev_hash],
                 vec![&"txs hash", &txs_hash],
                 vec![&"rxs hash", &rxs_hash],
