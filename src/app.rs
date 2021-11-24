@@ -18,15 +18,18 @@
 use crate::{config::Config, config::SERVICE_ACCOUNT_ID};
 use std::sync::Arc;
 use trinci_core::{
-    base::Mutex,
+    base::{serialize::rmp_serialize, Mutex},
     blockchain::{BlockConfig, BlockRequestSender, BlockService, Event, Message},
     bridge::{BridgeConfig, BridgeService},
-    crypto::{ed25519::KeyPair as ed25519KeyPair, ed25519::PublicKey, KeyPair},
+    crypto::{
+        ed25519::KeyPair as ed25519KeyPair, ed25519::PublicKey as ed25519PublicKey, Hash,
+        HashAlgorithm, KeyPair,
+    },
     db::RocksDb,
     p2p::{service::PeerConfig, PeerService},
     rest::{RestConfig, RestService},
     wm::{WasmLoader, WmLocal},
-    Error, ErrorKind,
+    Error, ErrorKind, PublicKey, Transaction, TransactionData,
 };
 /// Application context.
 pub struct App {
@@ -41,7 +44,7 @@ pub struct App {
     /// Keypair placeholder.
     pub keypair: KeyPair,
     /// p2p Keypair placeholder
-    pub p2p_public_key: PublicKey,
+    pub p2p_public_key: ed25519PublicKey,
 }
 
 // If this panics, it panics early at node boot. Not a big deal.
@@ -75,9 +78,13 @@ fn bootstrap_loader(bootstrap_path: String) -> impl WasmLoader {
 fn blockchain_loader(chan: BlockRequestSender) -> impl WasmLoader {
     move |hash| {
         // This is the path followed during normal operational stage.
+
+        let mut code_key = String::from("contracts:code:");
+        code_key.push_str(&hex::encode(hash));
+
         let req = Message::GetAccountRequest {
             id: SERVICE_ACCOUNT_ID.to_string(),
-            data: vec![hex::encode(hash)],
+            data: vec![code_key],
         };
         let res_chan = chan.send_sync(req).unwrap();
         match res_chan.recv_sync() {
@@ -97,8 +104,15 @@ fn blockchain_loader(chan: BlockRequestSender) -> impl WasmLoader {
     }
 }
 
-fn bootstrap_monitor(chan: BlockRequestSender, wm: Arc<Mutex<WmLocal>>) {
+fn bootstrap_monitor(tx: Transaction, chan: BlockRequestSender, wm: Arc<Mutex<WmLocal>>) {
     debug!("Bootstrap procedure started");
+    // FIXME
+    match chan.send_sync(Message::PutTransactionRequest { confirm: true, tx }) {
+        Ok(_) => debug!("init TX OK"),
+        Err(_) => error!("init TX KO"),
+    }
+
+    // Here can put some code to load the config from the bootloader
 
     let res_chan = chan
         .send_sync(Message::Subscribe {
@@ -106,6 +120,7 @@ fn bootstrap_monitor(chan: BlockRequestSender, wm: Arc<Mutex<WmLocal>>) {
             events: Event::BLOCK,
         })
         .unwrap();
+
     loop {
         match res_chan.recv_sync() {
             Ok(Message::GetBlockResponse { .. }) => {
@@ -127,6 +142,35 @@ fn bootstrap_monitor(chan: BlockRequestSender, wm: Arc<Mutex<WmLocal>>) {
         events: Event::BLOCK,
     })
     .unwrap();
+}
+
+// FIXME
+fn create_transaction_data(pk: PublicKey) -> TransactionData {
+    let bytes = std::fs::read("bootstrap.wasm").unwrap();
+
+    let hash = Hash::from_data(HashAlgorithm::Sha256, &bytes);
+
+    TransactionData {
+        schema: "schema".to_string(),
+        account: SERVICE_ACCOUNT_ID.to_string(),
+        fuel_limit: 0,
+        nonce: vec![0, 1, 2],
+        network: "skynet".to_string(),
+        contract: Some(hash),
+        method: "init".to_string(),
+        caller: pk,
+        args: bytes,
+    }
+}
+
+fn create_transaction(keypair: &KeyPair) -> Transaction {
+    let data = create_transaction_data(keypair.public_key());
+
+    let buf = rmp_serialize(&data).unwrap();
+
+    let signature = keypair.sign(&buf).unwrap();
+
+    Transaction { data, signature }
 }
 
 impl App {
@@ -152,7 +196,7 @@ impl App {
         let rest_svc = RestService::new(rest_config, chan.clone());
 
         let p2p_keypair = ed25519KeyPair::from_random();
-        let p2p_public_key = p2p_keypair.public_key();
+        let p2p_public_key: ed25519PublicKey = p2p_keypair.public_key();
 
         let p2p_config = PeerConfig {
             addr: config.p2p_addr.clone(),
@@ -192,8 +236,13 @@ impl App {
             self.block_svc.wm_arc().lock().set_loader(loader);
         } else {
             let wm = self.block_svc.wm_arc();
+
+            let bootstrap_monitor_chan = chan.clone();
+
+            let tx = create_transaction(&self.keypair);
+
             std::thread::spawn(move || {
-                bootstrap_monitor(chan, wm);
+                bootstrap_monitor(tx, bootstrap_monitor_chan, wm);
             });
         }
 

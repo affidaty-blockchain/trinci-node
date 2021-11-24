@@ -23,7 +23,7 @@ use std::{fs, path::Path};
 use toml::Value;
 
 /// TODO: add to configuration??? Maybe yes... maybe not.
-pub const SERVICE_ACCOUNT_ID: &str = "QmfZy5bvk7a3DQAjCbGNtmrPXWkyVvPrdnZMyBZ5q5ieKG";
+pub const SERVICE_ACCOUNT_ID: &str = "TRINCI";
 
 /// Default configuration file.
 const DEFAULT_CONFIG_FILE: &str = "config.toml";
