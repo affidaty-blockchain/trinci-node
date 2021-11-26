@@ -237,12 +237,10 @@ impl App {
         } else {
             let wm = self.block_svc.wm_arc();
 
-            let bootstrap_monitor_chan = chan.clone();
-
             let tx = create_transaction(&self.keypair);
 
             std::thread::spawn(move || {
-                bootstrap_monitor(tx, bootstrap_monitor_chan, wm);
+                bootstrap_monitor(tx, chan, wm);
             });
         }
 
