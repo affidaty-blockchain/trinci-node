@@ -16,9 +16,13 @@
 // along with TRINCI. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{config::Config, config::SERVICE_ACCOUNT_ID};
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use trinci_core::{
-    base::{serialize::rmp_serialize, Mutex},
+    base::{
+        serialize::{rmp_deserialize, rmp_serialize},
+        Mutex,
+    },
     blockchain::{BlockConfig, BlockRequestSender, BlockService, Event, Message},
     bridge::{BridgeConfig, BridgeService},
     crypto::{
@@ -106,13 +110,9 @@ fn blockchain_loader(chan: BlockRequestSender) -> impl WasmLoader {
 
 fn bootstrap_monitor(tx: Transaction, chan: BlockRequestSender, wm: Arc<Mutex<WmLocal>>) {
     debug!("Bootstrap procedure started");
-    // FIXME
-    match chan.send_sync(Message::PutTransactionRequest { confirm: true, tx }) {
-        Ok(_) => debug!("init TX OK"),
-        Err(_) => error!("init TX KO"),
-    }
 
-    // Here can put some code to load the config from the bootloader
+    chan.send_sync(Message::PutTransactionRequest { confirm: false, tx })
+        .unwrap(); // This unwrap will propagate the panic! is something goes wrong.
 
     let res_chan = chan
         .send_sync(Message::Subscribe {
@@ -125,9 +125,16 @@ fn bootstrap_monitor(tx: Transaction, chan: BlockRequestSender, wm: Arc<Mutex<Wm
         match res_chan.recv_sync() {
             Ok(Message::GetBlockResponse { .. }) => {
                 if is_service_present(&chan) {
+                    debug!("Bootstrap is over, loading configuration from Service account...");
+                    // set_config_from_service(&chan);
+
                     debug!("Bootstrap is over, switching to a better loader...");
                     let loader = blockchain_loader(chan.clone());
                     wm.lock().set_loader(loader);
+
+                    // FIXME
+                    // Here can put some code to load the config from the bootloader
+
                     break;
                 } else {
                     warn!("Block constructed but 'service' account is not yet active");
@@ -155,13 +162,47 @@ fn create_transaction_data(pk: PublicKey) -> TransactionData {
         account: SERVICE_ACCOUNT_ID.to_string(),
         fuel_limit: 0,
         nonce: vec![0, 1, 2],
-        network: "skynet".to_string(),
+        network: "testnet".to_string(), // FIXME This must be the same as the temporary in the config.toml file
         contract: Some(hash),
         method: "init".to_string(),
         caller: pk,
         args: bytes,
     }
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+struct BlockchainSettings {
+    network_name: String,
+    block_threshold: usize,
+    block_timeout: u16,
+}
+
+// If this panics, it panics early at node boot. Not a big deal.
+fn load_config_from_service(chan: &BlockRequestSender) -> BlockchainSettings {
+    let res_chan = chan
+        .send_sync(Message::GetAccountRequest {
+            id: SERVICE_ACCOUNT_ID.to_string(),
+            data: vec!["blockchain:settings".to_string()],
+        })
+        .unwrap();
+    match res_chan.recv_sync() {
+        Ok(Message::GetAccountResponse { acc: _, data }) => {
+            let data = data.get(0).unwrap().as_ref().unwrap(); // The unwrap propagates the panic!
+            match rmp_deserialize::<BlockchainSettings>(data) {
+                Ok(value) => value,
+                Err(_) => panic!("Settings deserialization failure"),
+            }
+        }
+        Ok(Message::Exception(err)) => match err.kind {
+            ErrorKind::ResourceNotFound => panic!("Resource not found"),
+            _ => panic!("Unexpected error: {}", err),
+        },
+        Ok(res) => panic!("Unexpected response from blockchain: {:?}", res),
+        Err(err) => panic!("Channel error: {:?}", err),
+    }
+}
+
+// FIXME // Probably this keypair must be created in each node from an harcoded HEX
 
 fn create_transaction(keypair: &KeyPair) -> Transaction {
     let data = create_transaction_data(keypair.public_key());
@@ -223,6 +264,19 @@ impl App {
         }
     }
 
+    // Load the config from the SERVICE data and store it in the block_service
+    fn set_config_from_service(&mut self, chan: &BlockRequestSender) {
+        let config = load_config_from_service(&chan);
+
+        self.block_svc.stop();
+        self.block_svc.set_block_config(
+            config.network_name,
+            config.block_threshold,
+            config.block_timeout,
+        );
+        self.block_svc.start();
+    }
+
     /// Starts the blockchain service to receive messages from the bootstrap procedure.
     /// Spawn a temporary thread that takes care of "service" account creation.
     /// Once that the service account is created, the thread takes care to set the
@@ -232,16 +286,22 @@ impl App {
 
         let chan = self.block_svc.request_channel();
         if is_service_present(&chan) {
+            self.set_config_from_service(&chan);
+
             let loader = blockchain_loader(chan);
             self.block_svc.wm_arc().lock().set_loader(loader);
+
+            // self.block_svc.worker_arc()
         } else {
             let wm = self.block_svc.wm_arc();
 
             let tx = create_transaction(&self.keypair);
 
-            std::thread::spawn(move || {
-                bootstrap_monitor(tx, chan, wm);
-            });
+            // std::thread::spawn(move || {
+            //     bootstrap_monitor(tx, chan, wm);
+            // });
+            bootstrap_monitor(tx, chan.clone(), wm);
+            self.set_config_from_service(&chan);
         }
 
         self.rest_svc.start();

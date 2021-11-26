@@ -24,7 +24,7 @@ bootstrap-path = "bootstrap.wasm"
 
 # Network indentifier.
 # Default: "skynet".
-network = "skynet"
+network = "testnet"
 
 # Http service address.
 # Default: 127.0.0.1
