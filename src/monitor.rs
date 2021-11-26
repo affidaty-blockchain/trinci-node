@@ -27,8 +27,8 @@ use ascii_table::{Align, AsciiTable, Column};
 use isahc::{Request, RequestExt};
 use serde::Serialize;
 use std::{
-    collections::BTreeMap, fmt::Display, fs::File, io::Write, process::Command, str::from_utf8,
-    thread::sleep, time::Duration,
+    collections::BTreeMap, fmt::Display, fs::File, io::Write, process::Command, thread::sleep,
+    time::Duration,
 };
 #[cfg(feature = "monitor")]
 use trinci_core::{
@@ -152,7 +152,7 @@ fn send_update(monitor: &mut Monitor, addr: &str) {
     };
 
     match response.send() {
-        Ok(response) => debug!("[monitor] update sended {:?}", response.body()),
+        Ok(_response) => debug!("[monitor] update sended"),
         Err(error) => warn!("[monitor] {:?}", error),
     }
 }
@@ -262,11 +262,11 @@ fn save_update(monitor: &mut Monitor, file: &str) {
     match &monitor.data.last_block {
         Some(last_block) => {
             // data preparation
-            let last_block_hash = from_utf8(last_block.hash.as_bytes()).unwrap_or("None");
-            let prev_hash = from_utf8(last_block.block.prev_hash.as_bytes()).unwrap_or("None");
-            let txs_hash = from_utf8(last_block.block.txs_hash.as_bytes()).unwrap_or("None");
-            let rxs_hash = from_utf8(last_block.block.rxs_hash.as_bytes()).unwrap_or("None");
-            let state_hash = from_utf8(last_block.block.state_hash.as_bytes()).unwrap_or("None");
+            let last_block_hash = hex::encode(last_block.hash.as_bytes());
+            let prev_hash = hex::encode(last_block.block.prev_hash.as_bytes());
+            let txs_hash = hex::encode(last_block.block.txs_hash.as_bytes());
+            let rxs_hash = hex::encode(last_block.block.rxs_hash.as_bytes());
+            let state_hash = hex::encode(last_block.block.state_hash.as_bytes());
 
             let block_data: Vec<Vec<&dyn Display>> = vec![
                 vec![&"hash", &last_block_hash],
