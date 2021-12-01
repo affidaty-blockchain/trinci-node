@@ -19,21 +19,15 @@ use crate::{config::Config, config::SERVICE_ACCOUNT_ID};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use trinci_core::{
-    base::{
-        serialize::{rmp_deserialize, rmp_serialize},
-        Mutex,
-    },
+    base::{serialize::rmp_deserialize, Mutex},
     blockchain::{BlockConfig, BlockRequestSender, BlockService, Event, Message},
     bridge::{BridgeConfig, BridgeService},
-    crypto::{
-        ed25519::KeyPair as ed25519KeyPair, ed25519::PublicKey as ed25519PublicKey, Hash,
-        HashAlgorithm, KeyPair,
-    },
+    crypto::{ed25519::KeyPair as ed25519KeyPair, ed25519::PublicKey as ed25519PublicKey, KeyPair},
     db::RocksDb,
     p2p::{service::PeerConfig, PeerService},
     rest::{RestConfig, RestService},
     wm::{WasmLoader, WmLocal},
-    Error, ErrorKind, PublicKey, Transaction, TransactionData,
+    Error, ErrorKind, Transaction,
 };
 /// Application context.
 pub struct App {
@@ -49,6 +43,8 @@ pub struct App {
     pub keypair: KeyPair,
     /// p2p Keypair placeholder
     pub p2p_public_key: ed25519PublicKey,
+    /// Bootstrap path
+    pub bootstrap_path: String,
 }
 
 // If this panics, it panics early at node boot. Not a big deal.
@@ -73,8 +69,8 @@ fn is_service_present(chan: &BlockRequestSender) -> bool {
 /// Smart contracts loader that is used during the bootstrap phase.
 /// This loader unconditionally loads the "bootstrap" contract and ignores the
 /// requested contract hash.
-fn bootstrap_loader(bootstrap_path: String) -> impl WasmLoader {
-    move |_hash| std::fs::read(&bootstrap_path).map_err(|err| Error::new_ext(ErrorKind::Other, err))
+fn bootstrap_loader(bootstrap_bin: Vec<u8>) -> impl WasmLoader {
+    move |_hash| Ok(bootstrap_bin.to_owned())
 }
 
 // Smart contracts loader that loads the binaries that were registered in the
@@ -108,11 +104,8 @@ fn blockchain_loader(chan: BlockRequestSender) -> impl WasmLoader {
     }
 }
 
-fn bootstrap_monitor(tx: Transaction, chan: BlockRequestSender, wm: Arc<Mutex<WmLocal>>) {
+fn bootstrap_monitor(chan: BlockRequestSender, wm: Arc<Mutex<WmLocal>>) {
     debug!("Bootstrap procedure started");
-
-    chan.send_sync(Message::PutTransactionRequest { confirm: false, tx })
-        .unwrap(); // This unwrap will propagate the panic! is something goes wrong.
 
     let res_chan = chan
         .send_sync(Message::Subscribe {
@@ -132,9 +125,6 @@ fn bootstrap_monitor(tx: Transaction, chan: BlockRequestSender, wm: Arc<Mutex<Wm
                     let loader = blockchain_loader(chan.clone());
                     wm.lock().set_loader(loader);
 
-                    // FIXME
-                    // Here can put some code to load the config from the bootloader
-
                     break;
                 } else {
                     warn!("Block constructed but 'service' account is not yet active");
@@ -151,30 +141,27 @@ fn bootstrap_monitor(tx: Transaction, chan: BlockRequestSender, wm: Arc<Mutex<Wm
     .unwrap();
 }
 
-// FIXME
-fn create_transaction_data(pk: PublicKey) -> TransactionData {
-    let bytes = std::fs::read("bootstrap.wasm").unwrap();
-
-    let hash = Hash::from_data(HashAlgorithm::Sha256, &bytes);
-
-    TransactionData {
-        schema: "schema".to_string(),
-        account: SERVICE_ACCOUNT_ID.to_string(),
-        fuel_limit: 0,
-        nonce: vec![0, 1, 2],
-        network: "testnet".to_string(), // FIXME This must be the same as the temporary in the config.toml file
-        contract: Some(hash),
-        method: "init".to_string(),
-        caller: pk,
-        args: bytes,
-    }
-}
-
 #[derive(Debug, Serialize, Deserialize)]
 struct BlockchainSettings {
     network_name: String,
     block_threshold: usize,
     block_timeout: u16,
+}
+
+// Load the boostrap struct from file, panic if something goes wrong
+fn load_bootstrap_struct_from_file(path: &String) -> Bootstrap {
+    let mut bootstrap_file = std::fs::File::open(path).expect("bootstrap file not found");
+    let mut buf = Vec::new();
+    std::io::Read::read_to_end(&mut bootstrap_file, &mut buf).expect("loading bootstrap");
+
+    rmp_deserialize::<Bootstrap>(&buf).expect("bootstrap file malformed")
+}
+#[derive(Serialize, Deserialize)]
+struct Bootstrap {
+    // Binary bootstrap.wasm
+    bin: Vec<u8>,
+    // Vec of transaction for the genesis block
+    txs: Vec<Transaction>,
 }
 
 // If this panics, it panics early at node boot. Not a big deal.
@@ -202,23 +189,11 @@ fn load_config_from_service(chan: &BlockRequestSender) -> BlockchainSettings {
     }
 }
 
-// FIXME // Probably this keypair must be created in each node from an harcoded HEX
-
-fn create_transaction(keypair: &KeyPair) -> Transaction {
-    let data = create_transaction_data(keypair.public_key());
-
-    let buf = rmp_serialize(&data).unwrap();
-
-    let signature = keypair.sign(&buf).unwrap();
-
-    Transaction { data, signature }
-}
-
 impl App {
     /// Create a new Application instance.
     pub fn new(config: Config, keypair: KeyPair) -> Self {
-        let bootstrap_loader = bootstrap_loader(config.bootstrap_path.clone());
-        let wm = WmLocal::new(bootstrap_loader, config.wm_cache_max);
+        let temporary_bootstrap_loader = bootstrap_loader(vec![]);
+        let wm = WmLocal::new(temporary_bootstrap_loader, config.wm_cache_max);
         let db = RocksDb::new(&config.db_path);
 
         let block_config = BlockConfig {
@@ -261,6 +236,7 @@ impl App {
             bridge_svc,
             keypair,
             p2p_public_key,
+            bootstrap_path: config.bootstrap_path,
         }
     }
 
@@ -274,6 +250,13 @@ impl App {
             config.block_threshold,
             config.block_timeout,
         );
+        self.block_svc.start();
+    }
+
+    // Insert the initial transactions in the pool
+    fn put_txs_in_the_pool(&mut self, txs: Vec<Transaction>) {
+        self.block_svc.stop();
+        self.block_svc.put_txs(txs);
         self.block_svc.start();
     }
 
@@ -295,12 +278,15 @@ impl App {
         } else {
             let wm = self.block_svc.wm_arc();
 
-            let tx = create_transaction(&self.keypair);
+            // Load the Boostrap Struct from file
+            let bootstrap = load_bootstrap_struct_from_file(&self.bootstrap_path);
 
-            // std::thread::spawn(move || {
-            //     bootstrap_monitor(tx, chan, wm);
-            // });
-            bootstrap_monitor(tx, chan.clone(), wm);
+            let bootstrap_loader = bootstrap_loader(bootstrap.bin);
+            self.block_svc.wm_arc().lock().set_loader(bootstrap_loader);
+
+            self.put_txs_in_the_pool(bootstrap.txs);
+
+            bootstrap_monitor(chan.clone(), wm);
             self.set_config_from_service(&chan);
         }
 
@@ -339,4 +325,51 @@ impl App {
         }
         println!("Something bad happened, stopping the application");
     }
+}
+
+#[test]
+fn read_bootstrap_bin() {
+    let mut bootstrap_file = std::fs::File::open("./bootstrap.bin").unwrap();
+    let mut buf = Vec::new();
+    std::io::Read::read_to_end(&mut bootstrap_file, &mut buf).expect("loading bootstrap");
+
+    let bootstrap = rmp_deserialize::<Bootstrap>(&buf);
+
+    assert!(bootstrap.is_ok());
+}
+
+#[test]
+#[ignore = "this is a temporary way to create bootstrap.bin"]
+fn create_bootstrap_bin() {
+    let mut bootstrap_file = std::fs::File::open("./bootstrap.wasm").unwrap();
+    let mut bootstrap = Vec::new();
+    std::io::Read::read_to_end(&mut bootstrap_file, &mut bootstrap).expect("loading bootstrap");
+
+    let mut bootstrap_init_file = std::fs::File::open("../trinci-cli/tx1.bin").unwrap();
+
+    let mut bootstrap_init_bin = Vec::new();
+    std::io::Read::read_to_end(&mut bootstrap_init_file, &mut bootstrap_init_bin)
+        .expect("loading bootstrap init bin");
+
+    println!("{}", hex::encode(&bootstrap_init_bin));
+
+    let tx1: Transaction = rmp_deserialize(&bootstrap_init_bin).unwrap();
+
+    let mut register_asset_file = std::fs::File::open("../trinci-cli/tx2.bin").unwrap();
+
+    let mut register_asset_bin = Vec::new();
+    std::io::Read::read_to_end(&mut register_asset_file, &mut register_asset_bin)
+        .expect("loading register asset bin");
+    let tx2: Transaction = rmp_deserialize(&register_asset_bin).unwrap();
+
+    let txs = vec![tx1, tx2];
+
+    let bootstrap_bin = Bootstrap {
+        bin: bootstrap,
+        txs,
+    };
+
+    let bootstrap_buf = trinci_core::base::serialize::rmp_serialize(&bootstrap_bin).unwrap();
+
+    std::fs::write("bootstrap.bin", bootstrap_buf).unwrap();
 }
