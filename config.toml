@@ -16,7 +16,7 @@ log-level = "debug"
 
 # Node keypair file.
 # Default: dynamically generated
-#keypair-path = "key.der"
+keypair-path = "ed25519_keypair.bin"
 
 # Node bootstrap file in WASM format.
 # Default: "bootstrap.wasm"
@@ -52,7 +52,7 @@ p2p-port = 9000
 
 # Max number of transactions per block.
 # Default: 42
-block-threshold = 3000
+block-threshold = 1
 
 # Max time (in seconds) that a transaction is left in the unconfirmed transaction
 # pool before try to generate a new block.

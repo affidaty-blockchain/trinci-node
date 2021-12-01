@@ -149,7 +149,7 @@ struct BlockchainSettings {
 }
 
 // Load the boostrap struct from file, panic if something goes wrong
-fn load_bootstrap_struct_from_file(path: &String) -> Bootstrap {
+fn load_bootstrap_struct_from_file(path: &str) -> Bootstrap {
     let mut bootstrap_file = std::fs::File::open(path).expect("bootstrap file not found");
     let mut buf = Vec::new();
     std::io::Read::read_to_end(&mut bootstrap_file, &mut buf).expect("loading bootstrap");
@@ -240,10 +240,8 @@ impl App {
         }
     }
 
-    // Load the config from the SERVICE data and store it in the block_service
-    fn set_config_from_service(&mut self, chan: &BlockRequestSender) {
-        let config = load_config_from_service(&chan);
-
+    // Set the block service config
+    fn set_block_service_config(&mut self, config: BlockchainSettings) {
         self.block_svc.stop();
         self.block_svc.set_block_config(
             config.network_name,
@@ -251,6 +249,13 @@ impl App {
             config.block_timeout,
         );
         self.block_svc.start();
+    }
+
+    // Load the config from the SERVICE data and store it in the block_service
+    fn set_config_from_service(&mut self, chan: &BlockRequestSender) {
+        let config = load_config_from_service(chan);
+
+        self.set_block_service_config(config);
     }
 
     // Insert the initial transactions in the pool
@@ -283,6 +288,12 @@ impl App {
 
             let bootstrap_loader = bootstrap_loader(bootstrap.bin);
             self.block_svc.wm_arc().lock().set_loader(bootstrap_loader);
+
+            self.set_block_service_config(BlockchainSettings {
+                network_name: "bootstrap".to_string(),
+                block_threshold: bootstrap.txs.len(),
+                block_timeout: 15,
+            });
 
             self.put_txs_in_the_pool(bootstrap.txs);
 

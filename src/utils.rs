@@ -26,21 +26,31 @@ pub fn load_keypair(filename: Option<String>) -> Result<KeyPair> {
     match filename {
         Some(filename) => {
             info!("Loading node keys from: {}", filename);
-            let ecdsa = if filename.contains("/tpm") {
+            if filename.contains("/tpm") {
                 #[cfg(not(feature = "tpm2"))]
                 panic!(
                     "TPM2 feature not included, for using tpm2 module compile with feature=tpm2"
                 );
                 #[cfg(feature = "tpm2")]
-                ecdsa::KeyPair::new_tpm2(ecdsa::CurveId::Secp256R1, filename.as_str())?
+                {
+                    let ecdsa =
+                        ecdsa::KeyPair::new_tpm2(ecdsa::CurveId::Secp256R1, filename.as_str())?;
+                    Ok(KeyPair::Ecdsa(ecdsa))
+                }
             } else {
-                let mut file = std::fs::File::open(filename)
+                let mut file = std::fs::File::open(&filename)
                     .map_err(|err| Error::new_ext(ErrorKind::MalformedData, err))?;
                 let mut bytes = Vec::new();
                 file.read_to_end(&mut bytes).expect("loading node keypair");
-                ecdsa::KeyPair::from_pkcs8_bytes(ecdsa::CurveId::Secp256R1, &bytes)?
-            };
-            Ok(KeyPair::Ecdsa(ecdsa))
+                if filename.contains("ecdsa") {
+                    let ecdsa =
+                        ecdsa::KeyPair::from_pkcs8_bytes(ecdsa::CurveId::Secp256R1, &bytes)?;
+                    Ok(KeyPair::Ecdsa(ecdsa))
+                } else {
+                    let ed25519 = ed25519::KeyPair::from_bytes(&bytes)?;
+                    Ok(KeyPair::Ed25519(ed25519))
+                }
+            }
         }
         None => {
             let ed25519 = ed25519::KeyPair::from_random();
