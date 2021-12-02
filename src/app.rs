@@ -16,8 +16,9 @@
 // along with TRINCI. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{config::Config, config::SERVICE_ACCOUNT_ID};
-use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+
+use serde::{Deserialize, Serialize};
 use trinci_core::{
     base::{serialize::rmp_deserialize, Mutex},
     blockchain::{BlockConfig, BlockRequestSender, BlockService, Event, Message},
@@ -63,6 +64,51 @@ fn is_service_present(chan: &BlockRequestSender) -> bool {
         },
         Ok(res) => panic!("Unexpected response from blockchain: {:?}", res),
         Err(err) => panic!("Channel error: {:?}", err),
+    }
+}
+
+use trinci_core::blockchain::IsValidator;
+
+// All nodes are validator for the first block
+fn is_validator_function_temporary(value: bool) -> impl IsValidator {
+    move |_account_id| {
+        warn!("OLD VALIDATOR"); // DELETE
+        Ok(value)
+    }
+}
+
+/// Method to check if the node is a current validator
+fn is_validator_function(chan: BlockRequestSender) -> impl IsValidator {
+    move |account_id: String| {
+        let mut validators_key = String::from("blockchain:validators:");
+        validators_key.push_str(&account_id);
+
+        let req = Message::GetAccountRequest {
+            id: SERVICE_ACCOUNT_ID.to_string(),
+            data: vec![validators_key],
+        };
+        let res_chan = chan.send_sync(req).unwrap(); // FIXME This is the point where it hangs
+        match res_chan.recv_sync() {
+            Ok(Message::GetAccountResponse { acc: _, mut data }) => {
+                error!("NEW VALIDATOR::RCV::004"); // DELETEME
+                if data.is_empty() || data[0].is_none() {
+                    Err(Error::new_ext(
+                        ErrorKind::ResourceNotFound,
+                        "smart contract not found",
+                    ))
+                } else {
+                    rmp_deserialize::<bool>(&data[0].take().unwrap())
+                }
+            }
+            Ok(Message::Exception(err)) => {
+                error!("NEW VALIDATOR::RCV::004.1"); // DELETEME
+                Err(err)
+            }
+            _ => {
+                error!("NEW VALIDATOR::RCV::005"); // DELETEME
+                Err(Error::new(ErrorKind::Other))
+            }
+        }
     }
 }
 
@@ -118,10 +164,9 @@ fn bootstrap_monitor(chan: BlockRequestSender, wm: Arc<Mutex<WmLocal>>) {
         match res_chan.recv_sync() {
             Ok(Message::GetBlockResponse { .. }) => {
                 if is_service_present(&chan) {
-                    debug!("Bootstrap is over, loading configuration from Service account...");
-                    // set_config_from_service(&chan);
-
-                    debug!("Bootstrap is over, switching to a better loader...");
+                    debug!(
+                        "Bootstrap is over, switching to a better loader and validator check..."
+                    );
                     let loader = blockchain_loader(chan.clone());
                     wm.lock().set_loader(loader);
 
@@ -202,7 +247,16 @@ impl App {
             timeout: config.block_timeout,
             network: config.network.clone(),
         };
-        let block_svc = BlockService::new(block_config, db, wm);
+
+        let is_validator = is_validator_function_temporary(true);
+
+        let block_svc = BlockService::new(
+            &keypair.public_key().to_account_id(),
+            is_validator,
+            block_config,
+            db,
+            wm,
+        );
         let chan = block_svc.request_channel();
 
         let rest_config = RestConfig {
@@ -258,6 +312,13 @@ impl App {
         self.set_block_service_config(config);
     }
 
+    // Set is_validator closure for block service
+    fn set_block_service_is_validator(&mut self, is_validator: impl IsValidator) {
+        self.block_svc.stop();
+        self.block_svc.set_validator(is_validator);
+        self.block_svc.start();
+    }
+
     // Insert the initial transactions in the pool
     fn put_txs_in_the_pool(&mut self, txs: Vec<Transaction>) {
         self.block_svc.stop();
@@ -292,14 +353,23 @@ impl App {
             self.set_block_service_config(BlockchainSettings {
                 network_name: "bootstrap".to_string(),
                 block_threshold: bootstrap.txs.len(),
-                block_timeout: 15,
+                block_timeout: 5, // The genesis block will be executed after this timeout // FIXME
             });
 
             self.put_txs_in_the_pool(bootstrap.txs);
 
             bootstrap_monitor(chan.clone(), wm);
-            self.set_config_from_service(&chan);
+
+            self.set_config_from_service(&chan.clone());
+
+            // FIXME
+            // let is_validator = is_validator_function_temporary(false);
+            let is_validator = is_validator_function(chan.clone());
+
+            self.set_block_service_is_validator(is_validator);
         }
+
+        warn!("Starting the services"); // DELETE
 
         self.rest_svc.start();
         self.p2p_svc.start();

@@ -57,7 +57,7 @@ block-threshold = 1
 # Max time (in seconds) that a transaction is left in the unconfirmed transaction
 # pool before try to generate a new block.
 # Default: 3
-block-timeout = 17
+block-timeout = 5
 
 # Database path within the file system.
 # Default: "db"
