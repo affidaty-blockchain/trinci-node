@@ -65,7 +65,7 @@ fn logger_level(level: &str) {
 fn show_config(config: &Config) {
     let keypair_path = config.keypair_path.as_deref().unwrap_or("null");
     info!("Configuration:");
-    info!("  Validator:              {}", config.validator);
+    info!("  Validator:            //  FIXME");
     info!("  Keypair path:           {}", keypair_path);
     info!("  Network Id:             {}", config.network);
     info!("  Block threshold:        {}", config.block_threshold);
@@ -134,11 +134,7 @@ fn main() {
             public_key,
             nw_public_key,
             ip_endpoint: None,
-            role: config
-                .validator
-                .then(|| monitor::NodeRole::Validator)
-                .or(Some(monitor::NodeRole::Ordinary))
-                .unwrap(),
+            role: monitor::NodeRole::Ordinary, // FIXME
             nw_config: monitor::NetworkConfig {
                 name: config.network,
                 //network_id: todo!(),

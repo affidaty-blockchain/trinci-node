@@ -87,14 +87,15 @@ fn is_validator_function(chan: BlockRequestSender) -> impl IsValidator {
             id: SERVICE_ACCOUNT_ID.to_string(),
             data: vec![validators_key],
         };
-        let res_chan = chan.send_sync(req).unwrap(); // FIXME This is the point where it hangs
+        let res_chan = chan.send_sync(req).unwrap();
+        error!("NEW VALIDATOR::SEND"); // DELETEME
         match res_chan.recv_sync() {
             Ok(Message::GetAccountResponse { acc: _, mut data }) => {
                 error!("NEW VALIDATOR::RCV::004"); // DELETEME
                 if data.is_empty() || data[0].is_none() {
                     Err(Error::new_ext(
                         ErrorKind::ResourceNotFound,
-                        "smart contract not found",
+                        "data not found",
                     ))
                 } else {
                     rmp_deserialize::<bool>(&data[0].take().unwrap())
@@ -242,7 +243,6 @@ impl App {
         let db = RocksDb::new(&config.db_path);
 
         let block_config = BlockConfig {
-            validator: config.validator,
             threshold: config.block_threshold,
             timeout: config.block_timeout,
             network: config.network.clone(),
@@ -363,7 +363,7 @@ impl App {
             self.set_config_from_service(&chan.clone());
 
             // FIXME
-            // let is_validator = is_validator_function_temporary(false);
+            // let is_validator = is_validator_function_temporary(true);
             let is_validator = is_validator_function(chan.clone());
 
             self.set_block_service_is_validator(is_validator);

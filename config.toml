@@ -5,10 +5,6 @@
 # built-in default value is used.
 #
 
-# Validator node participating to consensus.
-# Default: false
-validator = true
-
 # Logger verbosity level.
 # Available options: off, error, warn, info, debug, trace.
 # Default: info

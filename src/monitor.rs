@@ -73,6 +73,7 @@ pub struct NetworkConfig {
 #[derive(Serialize)]
 pub enum NodeRole {
     Ordinary,
+    #[allow(dead_code)] // FIXME
     Validator,
 }
 

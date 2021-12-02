@@ -79,9 +79,6 @@ pub const DEFAULT_MONITOR_ADDR: &str =
 pub struct Config {
     /// Log level.
     pub log_level: String,
-    /// Node started as a validator. A validator participates to the consensus
-    /// algorithm for blocks production (default: false).
-    pub validator: bool,
     /// Optional node keypair file.
     pub keypair_path: Option<String>,
     /// Network identifier.
@@ -121,7 +118,6 @@ impl Default for Config {
     fn default() -> Self {
         Config {
             log_level: DEFAULT_LOG_LEVEL.to_string(),
-            validator: false,
             keypair_path: None,
             network: DEFAULT_NETWORK_ID.to_string(),
             block_threshold: DEFAULT_BLOCK_THRESHOLD,
@@ -162,9 +158,6 @@ impl Config {
             }
         };
 
-        if let Some(value) = map.get("validator").and_then(|value| value.as_bool()) {
-            config.validator = value;
-        }
         if let Some(value) = map.get("log-level").and_then(|value| value.as_str()) {
             config.log_level = value.to_owned()
         }
@@ -236,11 +229,6 @@ pub fn create_app_config() -> Config {
                 .help("Configuration file (default 'config.toml')")
                 .value_name("CONFIG")
                 .required(false),
-        )
-        .arg(
-            clap::Arg::with_name("validator")
-                .long("validator")
-                .help("Start node as a validator"),
         )
         .arg(
             clap::Arg::with_name("log-level")
@@ -346,9 +334,6 @@ pub fn create_app_config() -> Config {
     let mut config = Config::from_file(config_file).expect("Bad config file");
 
     // Tweak configuration using command line arguments.
-    if matches.is_present("validator") {
-        config.validator = true;
-    }
     if let Some(value) = matches.value_of("log-level") {
         config.log_level = value.to_owned();
     }
@@ -411,7 +396,7 @@ mod tests {
         fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
             write!(
                 f,
-                "validator = {}\n\
+                "validator = FIXME\n\
                 log-level = '{}'\n\
                 network = '{}'\n\
                 block-threshold = {}\n\
@@ -426,7 +411,6 @@ mod tests {
                 db-path = '{}'\n\
                 bootstrap-path = '{}'\n\
                 wm-cache-max = {}",
-                self.validator,
                 self.log_level,
                 self.network,
                 self.block_threshold,
@@ -448,7 +432,6 @@ mod tests {
     fn create_test_config() -> Config {
         Config {
             log_level: "debug".to_string(),
-            validator: true,
             keypair_path: None,
             network: "dummy_network".to_string(),
             block_threshold: 1234,
