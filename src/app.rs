@@ -71,10 +71,7 @@ use trinci_core::blockchain::IsValidator;
 
 // All nodes are validator for the first block
 fn is_validator_function_temporary(value: bool) -> impl IsValidator {
-    move |_account_id| {
-        warn!("OLD VALIDATOR"); // DELETE
-        Ok(value)
-    }
+    move |_account_id| Ok(value)
 }
 
 /// Method to check if the node is a current validator
@@ -88,10 +85,8 @@ fn is_validator_function(chan: BlockRequestSender) -> impl IsValidator {
             data: vec![validators_key],
         };
         let res_chan = chan.send_sync(req).unwrap();
-        error!("NEW VALIDATOR::SEND"); // DELETEME
         match res_chan.recv_sync() {
             Ok(Message::GetAccountResponse { acc: _, mut data }) => {
-                error!("NEW VALIDATOR::RCV::004"); // DELETEME
                 if data.is_empty() || data[0].is_none() {
                     Err(Error::new_ext(
                         ErrorKind::ResourceNotFound,
@@ -101,14 +96,8 @@ fn is_validator_function(chan: BlockRequestSender) -> impl IsValidator {
                     rmp_deserialize::<bool>(&data[0].take().unwrap())
                 }
             }
-            Ok(Message::Exception(err)) => {
-                error!("NEW VALIDATOR::RCV::004.1"); // DELETEME
-                Err(err)
-            }
-            _ => {
-                error!("NEW VALIDATOR::RCV::005"); // DELETEME
-                Err(Error::new(ErrorKind::Other))
-            }
+            Ok(Message::Exception(err)) => Err(err),
+            _ => Err(Error::new(ErrorKind::Other)),
         }
     }
 }
@@ -250,7 +239,7 @@ impl App {
 
         let is_validator = is_validator_function_temporary(true);
 
-        let mut block_svc = BlockService::new(
+        let block_svc = BlockService::new(
             &keypair.public_key().to_account_id(),
             is_validator,
             block_config,
@@ -258,8 +247,6 @@ impl App {
             wm,
         );
         let chan = block_svc.request_channel();
-
-        block_svc.set_validator(is_validator_function(chan.clone()));
 
         let rest_config = RestConfig {
             addr: config.rest_addr.clone(),
@@ -339,10 +326,8 @@ impl App {
         if is_service_present(&chan) {
             self.set_config_from_service(&chan);
 
-            let loader = blockchain_loader(chan);
+            let loader = blockchain_loader(chan.clone());
             self.block_svc.wm_arc().lock().set_loader(loader);
-
-            // self.block_svc.worker_arc()
         } else {
             let wm = self.block_svc.wm_arc();
 
@@ -355,7 +340,7 @@ impl App {
             self.set_block_service_config(BlockchainSettings {
                 network_name: "bootstrap".to_string(),
                 block_threshold: bootstrap.txs.len(),
-                block_timeout: 5, // The genesis block will be executed after this timeout // FIXME
+                block_timeout: 2, // The genesis block will be executed after this timeout and not with block_threshold transactions in the pool // FIXME
             });
 
             self.put_txs_in_the_pool(bootstrap.txs);
@@ -363,15 +348,13 @@ impl App {
             bootstrap_monitor(chan.clone(), wm);
 
             self.set_config_from_service(&chan.clone());
-
-            // FIXME
-            // let is_validator = is_validator_function_temporary(true);
-            let is_validator = is_validator_function(chan.clone());
-
-            self.set_block_service_is_validator(is_validator);
         }
 
-        warn!("Starting the services"); // DELETE
+        let is_validator = is_validator_function(chan.clone());
+
+        self.set_block_service_is_validator(is_validator);
+
+        warn!("Starting the services");
 
         self.rest_svc.start();
         self.p2p_svc.start();
