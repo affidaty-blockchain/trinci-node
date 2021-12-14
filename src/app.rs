@@ -19,6 +19,8 @@ use crate::{config::Config, config::SERVICE_ACCOUNT_ID};
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
+use trinci_core::crypto::{Hash, HashAlgorithm};
+
 use trinci_core::{
     base::{serialize::rmp_deserialize, Mutex},
     blockchain::{BlockConfig, BlockRequestSender, BlockService, Event, Message},
@@ -184,12 +186,16 @@ struct BlockchainSettings {
 }
 
 // Load the boostrap struct from file, panic if something goes wrong
-fn load_bootstrap_struct_from_file(path: &str) -> Bootstrap {
+fn load_bootstrap_struct_from_file(path: &str) -> (String, Bootstrap) {
     let mut bootstrap_file = std::fs::File::open(path).expect("bootstrap file not found");
+
     let mut buf = Vec::new();
     std::io::Read::read_to_end(&mut bootstrap_file, &mut buf).expect("loading bootstrap");
 
-    rmp_deserialize::<Bootstrap>(&buf).expect("bootstrap file malformed")
+    (
+        hex::encode(Hash::from_data(HashAlgorithm::Sha256, &buf).as_ref()),
+        rmp_deserialize::<Bootstrap>(&buf).expect("bootstrap file malformed"),
+    )
 }
 #[derive(Serialize, Deserialize)]
 struct Bootstrap {
@@ -295,9 +301,9 @@ impl App {
     }
 
     // Load the config from the SERVICE data and store it in the block_service
-    fn set_config_from_service(&mut self, chan: &BlockRequestSender) {
-        let config = load_config_from_service(chan);
-
+    fn set_config_from_service(&mut self, chan: &BlockRequestSender, network_name: String) {
+        let mut config = load_config_from_service(chan); // FIXME - temporary
+        config.network_name = network_name;
         self.set_block_service_config(config);
     }
 
@@ -322,17 +328,17 @@ impl App {
     pub fn start(&mut self) {
         self.block_svc.start();
 
+        // Load the Boostrap Struct from file
+        let (bootstrap_hash, bootstrap) = load_bootstrap_struct_from_file(&self.bootstrap_path); // FIXME this is needed here because bootstrap network is not yet customizable
+
         let chan = self.block_svc.request_channel();
         if is_service_present(&chan) {
-            self.set_config_from_service(&chan);
+            self.set_config_from_service(&chan, bootstrap_hash);
 
             let loader = blockchain_loader(chan.clone());
             self.block_svc.wm_arc().lock().set_loader(loader);
         } else {
             let wm = self.block_svc.wm_arc();
-
-            // Load the Boostrap Struct from file
-            let bootstrap = load_bootstrap_struct_from_file(&self.bootstrap_path);
 
             let bootstrap_loader = bootstrap_loader(bootstrap.bin);
             self.block_svc.wm_arc().lock().set_loader(bootstrap_loader);
@@ -347,7 +353,7 @@ impl App {
 
             bootstrap_monitor(chan.clone(), wm);
 
-            self.set_config_from_service(&chan.clone());
+            self.set_config_from_service(&chan.clone(), bootstrap_hash);
         }
 
         let is_validator = is_validator_function(chan.clone());

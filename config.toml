@@ -15,7 +15,7 @@ log-level = "debug"
 keypair-path = "ed25519_keypair.bin"
 
 # Node bootstrap file in WASM format.
-# Default: "bootstrap.wasm"
+# Default: "bootstrap.bin"
 bootstrap-path = "bootstrap.bin"
 
 # Network indentifier.
