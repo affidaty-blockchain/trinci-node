@@ -250,7 +250,7 @@ impl App {
 
         let is_validator = is_validator_function_temporary(true);
 
-        let block_svc = BlockService::new(
+        let mut block_svc = BlockService::new(
             &keypair.public_key().to_account_id(),
             is_validator,
             block_config,
@@ -258,6 +258,8 @@ impl App {
             wm,
         );
         let chan = block_svc.request_channel();
+
+        block_svc.set_validator(is_validator_function(chan.clone()));
 
         let rest_config = RestConfig {
             addr: config.rest_addr.clone(),
