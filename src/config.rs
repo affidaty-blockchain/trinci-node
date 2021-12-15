@@ -32,7 +32,7 @@ const DEFAULT_CONFIG_FILE: &str = "config.toml";
 pub const DEFAULT_LOG_LEVEL: &str = "info";
 
 /// Default bootstrap file path.
-pub const DEFAULT_BOOTSTRAP_PATH: &str = "data/bootstrap.wasm";
+pub const DEFAULT_BOOTSTRAP_PATH: &str = "bootstrap.wasm";
 
 /// Default network identifier.
 pub const DEFAULT_NETWORK_ID: &str = "skynet";

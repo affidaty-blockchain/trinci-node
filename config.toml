@@ -16,11 +16,11 @@ log-level = "debug"
 
 # Node keypair file.
 # Default: dynamically generated
-#keypair-path = "data/ed25519_keypair.bin"
+#keypair-path = "key.der"
 
 # Node bootstrap file in WASM format.
-# Default: "data/bootstrap.wasm"
-bootstrap-path = "data/bootstrap.wasm"
+# Default: "bootstrap.wasm"
+bootstrap-path = "bootstrap.wasm"
 
 # Network indentifier.
 # Default: "skynet".
