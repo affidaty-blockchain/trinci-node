@@ -89,7 +89,7 @@ pub struct Status {
     pub pub_ip: String,
     /// node's role
     pub role: NodeRole,
-    /// partial netowrk config that reside in the bootstrap
+    /// partial network config that reside in the bootstrap
     pub nw_config: NetworkConfig,
     /// core version held by the node
     pub core_version: String,

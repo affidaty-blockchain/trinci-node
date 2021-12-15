@@ -417,16 +417,16 @@ fn create_bootstrap_bin() {
     std::io::Read::read_to_end(&mut bootstrap_init_file, &mut bootstrap_init_bin)
         .expect("loading bootstrap init bin");
 
-    let tx1: Transaction = rmp_deserialize(&bootstrap_init_bin).unwrap();
+    let tx1: Vec<Transaction> = rmp_deserialize(&bootstrap_init_bin).unwrap();
 
     let mut register_asset_file = std::fs::File::open("./tx2.bin").unwrap();
 
     let mut register_asset_bin = Vec::new();
     std::io::Read::read_to_end(&mut register_asset_file, &mut register_asset_bin)
         .expect("loading register asset bin");
-    let tx2: Transaction = rmp_deserialize(&register_asset_bin).unwrap();
+    let tx2: Vec<Transaction> = rmp_deserialize(&register_asset_bin).unwrap();
 
-    let txs = vec![tx1, tx2];
+    let txs = vec![tx1[0].clone(), tx2[0].clone()];
 
     let bootstrap_bin = Bootstrap {
         bin: bootstrap,
