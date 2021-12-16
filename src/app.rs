@@ -37,7 +37,7 @@ pub struct App {
     /// Rest service context.
     pub rest_svc: RestService,
     /// Peer2Peer service context.
-    pub p2p_svc: PeerService,
+    pub p2p_svc: Arc<Mutex<PeerService>>,
     /// Bridge service context.
     pub bridge_svc: BridgeService,
     /// Keypair placeholder.
@@ -280,7 +280,7 @@ impl App {
         App {
             block_svc: Arc::new(Mutex::new(block_svc)),
             rest_svc,
-            p2p_svc,
+            p2p_svc: Arc::new(Mutex::new(p2p_svc)),
             bridge_svc,
             keypair,
             p2p_public_key,
@@ -300,9 +300,11 @@ impl App {
     }
 
     // Load the config from the SERVICE data and store it in the block_service
-    fn set_config_from_service(&mut self, chan: &BlockRequestSender) {
+    fn set_config_from_service(&mut self, chan: &BlockRequestSender) -> String {
         let config = load_config_from_service(chan);
+        let network_name = config.network_name.clone();
         self.set_block_service_config(config);
+        network_name
     }
 
     // Set is_validator closure for block service
@@ -360,9 +362,9 @@ impl App {
             });
 
             let block_svc = self.block_svc.clone();
+            let p2p_svc = self.p2p_svc.clone();
 
             if bootstrap_txs.is_empty() {
-                println!("NOT BLOCKING");
                 let chan_bootstrap = chan.clone();
                 std::thread::spawn(move || {
                     bootstrap_monitor(chan_bootstrap.clone(), wm);
@@ -371,33 +373,36 @@ impl App {
                     let config = load_config_from_service(&chan_bootstrap.clone());
                     bs.stop();
                     bs.set_block_config(
-                        config.network_name,
+                        config.network_name.clone(),
                         config.block_threshold,
                         config.block_timeout,
                     );
 
                     let is_validator = is_validator_function(chan.clone());
                     bs.set_validator(is_validator);
+
                     bs.start();
+                    p2p_svc.lock().stop();
+                    p2p_svc.lock().set_network_name(config.network_name);
+                    p2p_svc.lock().start();
                 });
             } else {
-                // FIXME
-                println!("BLOCKING");
                 self.put_txs_in_the_pool(bootstrap_txs);
 
                 bootstrap_monitor(chan.clone(), wm);
 
-                self.set_config_from_service(&chan.clone());
+                let network_name = self.set_config_from_service(&chan.clone());
                 let is_validator = is_validator_function(chan.clone());
 
                 self.set_block_service_is_validator(is_validator);
+                p2p_svc.lock().set_network_name(network_name);
             }
         }
 
         warn!("Starting the services");
 
         self.rest_svc.start();
-        self.p2p_svc.start();
+        self.p2p_svc.lock().start();
         self.bridge_svc.start();
     }
 
@@ -424,7 +429,7 @@ impl App {
             if stop {
                 self.block_svc.lock().stop();
                 self.rest_svc.stop();
-                self.p2p_svc.stop();
+                self.p2p_svc.lock().stop();
                 self.bridge_svc.stop();
                 break;
             }
