@@ -118,7 +118,7 @@ fn main() {
     app.start();
 
     // Temporary blockchain "stuff" tracer.
-    let chan = app.block_svc.request_channel();
+    let chan = app.block_svc.lock().request_channel();
     std::thread::spawn(move || tracer::run(chan));
 
     // block chain monitor
@@ -153,7 +153,7 @@ fn main() {
         };
 
         let mut monitor_struct = monitor::Monitor::new(node_id, node_status);
-        let chan = app.block_svc.request_channel();
+        let chan = app.block_svc.lock().request_channel();
         let addr = config.monitor_addr.clone();
         let file = config.monitor_file;
 

@@ -19,7 +19,6 @@ use crate::{config::Config, config::SERVICE_ACCOUNT_ID};
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
-
 use trinci_core::{
     base::{serialize::rmp_deserialize, Mutex},
     blockchain::{BlockConfig, BlockRequestSender, BlockService, Event, Message},
@@ -34,7 +33,7 @@ use trinci_core::{
 /// Application context.
 pub struct App {
     /// Block service context.
-    pub block_svc: BlockService<RocksDb, WmLocal>,
+    pub block_svc: Arc<Mutex<BlockService<RocksDb, WmLocal>>>,
     /// Rest service context.
     pub rest_svc: RestService,
     /// Peer2Peer service context.
@@ -183,13 +182,16 @@ struct BlockchainSettings {
 }
 
 // Load the boostrap struct from file, panic if something goes wrong
-fn load_bootstrap_struct_from_file(path: &str) -> Bootstrap {
+fn load_bootstrap_struct_from_file(path: &str) -> (Vec<u8>, Vec<Transaction>) {
     let mut bootstrap_file = std::fs::File::open(path).expect("bootstrap file not found");
 
     let mut buf = Vec::new();
     std::io::Read::read_to_end(&mut bootstrap_file, &mut buf).expect("loading bootstrap");
 
-    rmp_deserialize::<Bootstrap>(&buf).expect("bootstrap file malformed")
+    match rmp_deserialize::<Bootstrap>(&buf) {
+        Ok(bs) => (bs.bin, bs.txs),
+        Err(_) => (buf, vec![]),
+    }
 }
 #[derive(Serialize, Deserialize)]
 struct Bootstrap {
@@ -273,7 +275,7 @@ impl App {
         let bridge_svc = BridgeService::new(bridge_config, chan);
 
         App {
-            block_svc,
+            block_svc: Arc::new(Mutex::new(block_svc)),
             rest_svc,
             p2p_svc,
             bridge_svc,
@@ -285,13 +287,13 @@ impl App {
 
     // Set the block service config
     fn set_block_service_config(&mut self, config: BlockchainSettings) {
-        self.block_svc.stop();
-        self.block_svc.set_block_config(
+        self.block_svc.lock().stop();
+        self.block_svc.lock().set_block_config(
             config.network_name,
             config.block_threshold,
             config.block_timeout,
         );
-        self.block_svc.start();
+        self.block_svc.lock().start();
     }
 
     // Load the config from the SERVICE data and store it in the block_service
@@ -302,16 +304,16 @@ impl App {
 
     // Set is_validator closure for block service
     fn set_block_service_is_validator(&mut self, is_validator: impl IsValidator) {
-        self.block_svc.stop();
-        self.block_svc.set_validator(is_validator);
-        self.block_svc.start();
+        self.block_svc.lock().stop();
+        self.block_svc.lock().set_validator(is_validator);
+        self.block_svc.lock().start();
     }
 
     // Insert the initial transactions in the pool
     fn put_txs_in_the_pool(&mut self, txs: Vec<Transaction>) {
-        self.block_svc.stop();
-        self.block_svc.put_txs(txs);
-        self.block_svc.start();
+        self.block_svc.lock().stop();
+        self.block_svc.lock().put_txs(txs);
+        self.block_svc.lock().start();
     }
 
     /// Starts the blockchain service to receive messages from the bootstrap procedure.
@@ -319,40 +321,75 @@ impl App {
     /// Once that the service account is created, the thread takes care to set the
     /// main smart contracts loader within the wasm machine.
     pub fn start(&mut self) {
-        self.block_svc.start();
+        self.block_svc.lock().start();
 
-        let chan = self.block_svc.request_channel();
+        let chan = self.block_svc.lock().request_channel();
         if is_service_present(&chan) {
             self.set_config_from_service(&chan);
 
             let loader = blockchain_loader(chan.clone());
-            self.block_svc.wm_arc().lock().set_loader(loader);
+            self.block_svc.lock().wm_arc().lock().set_loader(loader);
         } else {
             // Load the Boostrap Struct from file
-            let bootstrap = load_bootstrap_struct_from_file(&self.bootstrap_path);
+            let (bootstrap_bin, bootstrap_txs) =
+                load_bootstrap_struct_from_file(&self.bootstrap_path);
 
-            let wm = self.block_svc.wm_arc();
+            let wm = self.block_svc.lock().wm_arc();
 
-            let bootstrap_loader = bootstrap_loader(bootstrap.bin);
-            self.block_svc.wm_arc().lock().set_loader(bootstrap_loader);
+            let bootstrap_loader = bootstrap_loader(bootstrap_bin);
+            self.block_svc
+                .lock()
+                .wm_arc()
+                .lock()
+                .set_loader(bootstrap_loader);
+
+            let block_threshold = if bootstrap_txs.is_empty() {
+                42
+            } else {
+                bootstrap_txs.len()
+            };
 
             self.set_block_service_config(BlockchainSettings {
                 network_name: "bootstrap".to_string(),
                 accept_broadcast: false,
-                block_threshold: bootstrap.txs.len(),
+                block_threshold,
                 block_timeout: 2, // The genesis block will be executed after this timeout and not with block_threshold transactions in the pool // FIXME
             });
 
-            self.put_txs_in_the_pool(bootstrap.txs);
+            let block_svc = self.block_svc.clone();
 
-            bootstrap_monitor(chan.clone(), wm);
+            if bootstrap_txs.is_empty() {
+                println!("NOT BLOCKING");
+                let chan_bootstrap = chan.clone();
+                std::thread::spawn(move || {
+                    bootstrap_monitor(chan_bootstrap.clone(), wm);
 
-            self.set_config_from_service(&chan.clone());
+                    let mut bs = block_svc.lock();
+                    let config = load_config_from_service(&chan_bootstrap.clone());
+                    bs.stop();
+                    bs.set_block_config(
+                        config.network_name,
+                        config.block_threshold,
+                        config.block_timeout,
+                    );
+
+                    let is_validator = is_validator_function(chan.clone());
+                    bs.set_validator(is_validator);
+                    bs.start();
+                });
+            } else {
+                // FIXME
+                println!("BLOCKING");
+                self.put_txs_in_the_pool(bootstrap_txs);
+
+                bootstrap_monitor(chan.clone(), wm);
+
+                self.set_config_from_service(&chan.clone());
+                let is_validator = is_validator_function(chan.clone());
+
+                self.set_block_service_is_validator(is_validator);
+            }
         }
-
-        let is_validator = is_validator_function(chan.clone());
-
-        self.set_block_service_is_validator(is_validator);
 
         warn!("Starting the services");
 
@@ -365,7 +402,7 @@ impl App {
         loop {
             std::thread::sleep(std::time::Duration::from_secs(1));
             let mut stop = false;
-            if !self.block_svc.is_running() {
+            if !self.block_svc.lock().is_running() {
                 error!("Blockchain service is not running");
                 stop = true;
             }
@@ -382,7 +419,7 @@ impl App {
                 stop = true;
             }
             if stop {
-                self.block_svc.stop();
+                self.block_svc.lock().stop();
                 self.rest_svc.stop();
                 self.p2p_svc.stop();
                 self.bridge_svc.stop();
@@ -393,47 +430,69 @@ impl App {
     }
 }
 
-#[test]
-fn read_bootstrap_bin() {
-    let mut bootstrap_file = std::fs::File::open("./bootstrap.bin").unwrap();
-    let mut buf = Vec::new();
-    std::io::Read::read_to_end(&mut bootstrap_file, &mut buf).expect("loading bootstrap");
+#[cfg(test)]
+mod tests {
+    use crate::app::Bootstrap;
+    use glob::glob;
+    use trinci_core::{base::serialize::rmp_deserialize, Message};
 
-    let bootstrap = rmp_deserialize::<Bootstrap>(&buf);
+    #[test]
+    fn read_bootstrap_bin() {
+        let mut bootstrap_file = std::fs::File::open("./bootstrap.bin").unwrap();
+        let mut buf = Vec::new();
+        std::io::Read::read_to_end(&mut bootstrap_file, &mut buf).expect("loading bootstrap");
 
-    assert!(bootstrap.is_ok());
-}
+        let bootstrap = rmp_deserialize::<Bootstrap>(&buf);
 
-#[test]
-#[ignore = "this is a temporary way to create bootstrap.bin"]
-fn create_bootstrap_bin() {
-    let mut bootstrap_file = std::fs::File::open("./bootstrap.wasm").unwrap();
-    let mut bootstrap = Vec::new();
-    std::io::Read::read_to_end(&mut bootstrap_file, &mut bootstrap).expect("loading bootstrap");
+        assert!(bootstrap.is_ok());
 
-    let mut bootstrap_init_file = std::fs::File::open("./tx1.bin").unwrap();
+        println!("{} Transactions", bootstrap.unwrap().txs.len());
+    }
 
-    let mut bootstrap_init_bin = Vec::new();
-    std::io::Read::read_to_end(&mut bootstrap_init_file, &mut bootstrap_init_bin)
-        .expect("loading bootstrap init bin");
+    #[test]
+    #[ignore = "this is a temporary way to create bootstrap.bin"]
+    fn create_bootstrap_bin() {
+        let mut bootstrap_file = std::fs::File::open("./bootstrap.wasm").unwrap();
+        let mut bootstrap = Vec::new();
+        std::io::Read::read_to_end(&mut bootstrap_file, &mut bootstrap).expect("loading bootstrap");
 
-    let tx1: Vec<Transaction> = rmp_deserialize(&bootstrap_init_bin).unwrap();
+        let mut txs = Vec::new();
 
-    let mut register_asset_file = std::fs::File::open("./tx2.bin").unwrap();
+        for entry in glob("./txs/*.bin").expect("Failed to read glob pattern") {
+            match entry {
+                Ok(path) => {
+                    let filename = path.clone();
+                    let filename = filename.file_name().unwrap().to_str().unwrap();
 
-    let mut register_asset_bin = Vec::new();
-    std::io::Read::read_to_end(&mut register_asset_file, &mut register_asset_bin)
-        .expect("loading register asset bin");
-    let tx2: Vec<Transaction> = rmp_deserialize(&register_asset_bin).unwrap();
+                    if !filename.starts_with("_") {
+                        let mut tx_file = std::fs::File::open(path).unwrap();
 
-    let txs = vec![tx1[0].clone(), tx2[0].clone()];
+                        let mut tx_bin = Vec::new();
+                        std::io::Read::read_to_end(&mut tx_file, &mut tx_bin)
+                            .expect(&format!("Error reading: {:?}", filename));
 
-    let bootstrap_bin = Bootstrap {
-        bin: bootstrap,
-        txs,
-    };
+                        let msg: Message = rmp_deserialize(&tx_bin).unwrap();
 
-    let bootstrap_buf = trinci_core::base::serialize::rmp_serialize(&bootstrap_bin).unwrap();
+                        let tx = match msg {
+                            Message::PutTransactionRequest { confirm: _, tx } => tx,
+                            _ => panic!("Expected put transaction request message"),
+                        };
 
-    std::fs::write("bootstrap.bin", bootstrap_buf).unwrap();
+                        txs.push(tx);
+                        println!("Added tx: {}", filename);
+                    }
+                }
+                Err(e) => println!("{:?}", e),
+            }
+        }
+
+        let bootstrap_bin = Bootstrap {
+            bin: bootstrap,
+            txs,
+        };
+
+        let bootstrap_buf = trinci_core::base::serialize::rmp_serialize(&bootstrap_bin).unwrap();
+
+        std::fs::write("bootstrap.bin", bootstrap_buf).unwrap();
+    }
 }
