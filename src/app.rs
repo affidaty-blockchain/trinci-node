@@ -282,9 +282,9 @@ impl App {
             rest_svc,
             p2p_svc: Arc::new(Mutex::new(p2p_svc)),
             bridge_svc,
-            keypair,
             p2p_public_key,
             bootstrap_path: config.bootstrap_path,
+            keypair,
         }
     }
 

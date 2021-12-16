@@ -263,6 +263,7 @@ fn save_update(monitor: &mut Monitor, file: &str) {
     match &monitor.data.last_block {
         Some(last_block) => {
             // data preparation
+
             let last_block_hash = hex::encode(last_block.hash.as_bytes());
             let prev_hash = hex::encode(last_block.block.data.prev_hash.as_bytes());
             let txs_hash = hex::encode(last_block.block.data.txs_hash.as_bytes());
