@@ -41,7 +41,7 @@ pub struct App {
     /// Bridge service context.
     pub bridge_svc: BridgeService,
     /// Keypair placeholder.
-    pub keypair: KeyPair,
+    pub keypair: Arc<KeyPair>,
     /// p2p Keypair placeholder
     pub p2p_public_key: ed25519PublicKey,
     /// Bootstrap path
@@ -233,10 +233,13 @@ impl App {
         let wm = WmLocal::new(temporary_bootstrap_loader, config.wm_cache_max);
         let db = RocksDb::new(&config.db_path);
 
+        let keypair = Arc::new(keypair);
+
         let block_config = BlockConfig {
             threshold: config.block_threshold,
             timeout: config.block_timeout,
             network: config.network.clone(),
+            keypair: keypair.clone(),
         };
 
         let is_validator = is_validator_function_temporary(true);
