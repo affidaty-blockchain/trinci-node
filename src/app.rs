@@ -339,6 +339,10 @@ impl App {
             let loader = blockchain_loader(chan.clone());
             self.block_svc.lock().wm_arc().lock().set_loader(loader);
 
+            let is_validator = is_validator_function(chan.clone());
+
+            self.set_block_service_is_validator(is_validator);
+
             self.p2p_svc.lock().set_network_name(network_name);
             p2p_start = true;
         } else {
@@ -403,9 +407,10 @@ impl App {
                 bootstrap_monitor(chan.clone(), wm);
 
                 let network_name = self.set_config_from_service(&chan.clone());
-                let is_validator = is_validator_function(chan.clone());
 
+                let is_validator = is_validator_function(chan.clone());
                 self.set_block_service_is_validator(is_validator);
+
                 self.p2p_svc.lock().set_network_name(network_name);
                 p2p_start = true;
             }
