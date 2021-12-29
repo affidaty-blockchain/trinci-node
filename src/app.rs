@@ -265,7 +265,7 @@ impl App {
         let p2p_config = PeerConfig {
             addr: config.p2p_addr.clone(),
             port: config.p2p_port,
-            network: config.network.clone(),
+            network: Mutex::new(config.network.clone()),
             bootstrap_addr: config.p2p_bootstrap_addr.clone(),
             p2p_keypair: Some(p2p_keypair),
         };
@@ -303,6 +303,7 @@ impl App {
     fn set_config_from_service(&mut self, chan: &BlockRequestSender) -> String {
         let config = load_config_from_service(chan);
         let network_name = config.network_name.clone();
+        warn!("network name: {}", network_name); // DELETEME
         self.set_block_service_config(config);
         network_name
     }
@@ -326,16 +327,23 @@ impl App {
     /// Once that the service account is created, the thread takes care to set the
     /// main smart contracts loader within the wasm machine.
     pub fn start(&mut self) {
+        let p2p_start;
+
         self.block_svc.lock().start();
 
         let chan = self.block_svc.lock().request_channel();
         if is_service_present(&chan) {
-            self.set_config_from_service(&chan);
+            info!("SERVICE PRESENT"); // DELETEME
+            let network_name = self.set_config_from_service(&chan);
 
             let loader = blockchain_loader(chan.clone());
             self.block_svc.lock().wm_arc().lock().set_loader(loader);
+
+            self.p2p_svc.lock().set_network_name(network_name);
+            p2p_start = true;
         } else {
-            // Load the Boostrap Struct from file
+            info!("SERVICE NOT PRESENT: LOADING FROM FILE"); // DELETEME
+                                                             // Load the Boostrap Struct from file
             let (bootstrap_bin, bootstrap_txs) =
                 load_bootstrap_struct_from_file(&self.bootstrap_path);
 
@@ -365,12 +373,14 @@ impl App {
             let p2p_svc = self.p2p_svc.clone();
 
             if bootstrap_txs.is_empty() {
+                info!("NO TRANSACTION IN BOOTSTRAP"); // DELETEME
                 let chan_bootstrap = chan.clone();
                 std::thread::spawn(move || {
                     bootstrap_monitor(chan_bootstrap.clone(), wm);
 
                     let mut bs = block_svc.lock();
                     let config = load_config_from_service(&chan_bootstrap.clone());
+                    warn!("network name: {}", config.network_name); // DELETEME
                     bs.stop();
                     bs.set_block_config(
                         config.network_name.clone(),
@@ -382,11 +392,12 @@ impl App {
                     bs.set_validator(is_validator);
 
                     bs.start();
-                    p2p_svc.lock().stop();
                     p2p_svc.lock().set_network_name(config.network_name);
                     p2p_svc.lock().start();
                 });
+                p2p_start = false;
             } else {
+                info!("{} TRANSACTION IN BOOTSTRAP", bootstrap_txs.len()); // DELETEME
                 self.put_txs_in_the_pool(bootstrap_txs);
 
                 bootstrap_monitor(chan.clone(), wm);
@@ -395,14 +406,17 @@ impl App {
                 let is_validator = is_validator_function(chan.clone());
 
                 self.set_block_service_is_validator(is_validator);
-                p2p_svc.lock().set_network_name(network_name);
+                self.p2p_svc.lock().set_network_name(network_name);
+                p2p_start = true;
             }
         }
 
         warn!("Starting the services");
 
         self.rest_svc.start();
-        self.p2p_svc.lock().start();
+        if p2p_start {
+            self.p2p_svc.lock().start();
+        }
         self.bridge_svc.start();
     }
 
