@@ -16,9 +16,12 @@
 // along with TRINCI. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{config::Config, config::SERVICE_ACCOUNT_ID};
-use std::sync::Arc;
-
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+use trinci_core::base::BlockchainSettings;
+use trinci_core::crypto::{Hash, HashAlgorithm};
+use trinci_core::db::Db;
+
 use trinci_core::{
     base::{serialize::rmp_deserialize, Mutex},
     blockchain::{BlockConfig, BlockRequestSender, BlockService, Event, Message},
@@ -173,24 +176,22 @@ fn bootstrap_monitor(chan: BlockRequestSender, wm: Arc<Mutex<WmLocal>>) {
     .unwrap();
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct BlockchainSettings {
-    network_name: String,
-    accept_broadcast: bool,
-    block_threshold: usize,
-    block_timeout: u16,
+// Calculate the network name from the bootstrap hash
+fn calculate_network_name(data: &[u8]) -> String {
+    let hash = Hash::from_data(HashAlgorithm::Sha256, data);
+    bs58::encode(hash).into_string()
 }
 
 // Load the boostrap struct from file, panic if something goes wrong
-fn load_bootstrap_struct_from_file(path: &str) -> (Vec<u8>, Vec<Transaction>) {
+fn load_bootstrap_struct_from_file(path: &str) -> (String, Vec<u8>, Vec<Transaction>) {
     let mut bootstrap_file = std::fs::File::open(path).expect("bootstrap file not found");
 
     let mut buf = Vec::new();
     std::io::Read::read_to_end(&mut bootstrap_file, &mut buf).expect("loading bootstrap");
 
     match rmp_deserialize::<Bootstrap>(&buf) {
-        Ok(bs) => (bs.bin, bs.txs),
-        Err(_) => (buf, vec![]),
+        Ok(bs) => (calculate_network_name(&buf), bs.bin, bs.txs),
+        Err(_) => (String::from(""), buf, vec![]),
     }
 }
 #[derive(Serialize, Deserialize)]
@@ -202,6 +203,7 @@ struct Bootstrap {
 }
 
 // If this panics, it panics early at node boot. Not a big deal.
+// This should be called only once after the genesis block
 fn load_config_from_service(chan: &BlockRequestSender) -> BlockchainSettings {
     let res_chan = chan
         .send_sync(Message::GetAccountRequest {
@@ -212,6 +214,9 @@ fn load_config_from_service(chan: &BlockRequestSender) -> BlockchainSettings {
     match res_chan.recv_sync() {
         Ok(Message::GetAccountResponse { acc: _, data }) => {
             let data = data.get(0).unwrap().as_ref().unwrap(); // The unwrap propagates the panic!
+
+            println!("SETTINGS: {:?}", data);
+
             match rmp_deserialize::<BlockchainSettings>(data) {
                 Ok(value) => value,
                 Err(_) => panic!("Settings deserialization failure"),
@@ -292,20 +297,30 @@ impl App {
     fn set_block_service_config(&mut self, config: BlockchainSettings) {
         self.block_svc.lock().stop();
         self.block_svc.lock().set_block_config(
-            config.network_name,
+            config.network_name.unwrap(), // If this fails is at the very beginning
             config.block_threshold,
             config.block_timeout,
         );
         self.block_svc.lock().start();
     }
 
-    // Load the config from the SERVICE data and store it in the block_service
-    fn set_config_from_service(&mut self, chan: &BlockRequestSender) -> String {
-        let config = load_config_from_service(chan);
-        let network_name = config.network_name.clone();
-        warn!("network name: {}", network_name); // DELETEME
+    // Load the config from the DB
+    fn set_config_from_db(&mut self) -> String {
+        let block_svc = self.block_svc.clone();
+        let db = block_svc.lock().db_arc();
+        let buf = db.read().load_configuration("blockchain:settings").unwrap(); // If this fails is at the very beginning
+        let config = rmp_deserialize::<BlockchainSettings>(&buf).unwrap(); // If this fails is at the very beginning
+
+        let network_name = config.network_name.clone().unwrap(); // If this fails is at the very beginning
+        warn!("network name: {:?}", network_name); // DELETEME
         self.set_block_service_config(config);
         network_name
+    }
+
+    // Store the blockchain config in the DB
+    fn store_config_into_db(&mut self, config: BlockchainSettings) {
+        let block_svc = self.block_svc.clone();
+        block_svc.lock().store_config_into_db(config);
     }
 
     // Set is_validator closure for block service
@@ -334,12 +349,12 @@ impl App {
         let chan = self.block_svc.lock().request_channel();
         if is_service_present(&chan) {
             info!("SERVICE PRESENT"); // DELETEME
-            let network_name = self.set_config_from_service(&chan);
+            let network_name = self.set_config_from_db();
 
             let loader = blockchain_loader(chan.clone());
             self.block_svc.lock().wm_arc().lock().set_loader(loader);
 
-            let is_validator = is_validator_function(chan.clone());
+            let is_validator = is_validator_function(chan);
 
             self.set_block_service_is_validator(is_validator);
 
@@ -347,8 +362,9 @@ impl App {
             p2p_start = true;
         } else {
             info!("SERVICE NOT PRESENT: LOADING FROM FILE"); // DELETEME
-                                                             // Load the Boostrap Struct from file
-            let (bootstrap_bin, bootstrap_txs) =
+
+            // Load the Boostrap Struct from file
+            let (good_network_name, bootstrap_bin, bootstrap_txs) =
                 load_bootstrap_struct_from_file(&self.bootstrap_path);
 
             let wm = self.block_svc.lock().wm_arc();
@@ -367,7 +383,7 @@ impl App {
             };
 
             self.set_block_service_config(BlockchainSettings {
-                network_name: "bootstrap".to_string(),
+                network_name: Some("bootstrap".to_string()),
                 accept_broadcast: false,
                 block_threshold,
                 block_timeout: 2, // The genesis block will be executed after this timeout and not with block_threshold transactions in the pool // FIXME
@@ -383,20 +399,28 @@ impl App {
                     bootstrap_monitor(chan_bootstrap.clone(), wm);
 
                     let mut bs = block_svc.lock();
-                    let config = load_config_from_service(&chan_bootstrap.clone());
-                    warn!("network name: {}", config.network_name); // DELETEME
+                    let mut config = load_config_from_service(&chan_bootstrap.clone());
+
+                    config.network_name = Some(good_network_name);
+                    warn!("network name: {:?}", config.network_name); // DELETEME
                     bs.stop();
+
+                    let net_name = config.network_name.clone().unwrap(); // This shall not fail
+
                     bs.set_block_config(
-                        config.network_name.clone(),
+                        net_name.clone(),
                         config.block_threshold,
                         config.block_timeout,
                     );
+
+                    // Store the configuration on the DB
+                    bs.store_config_into_db(config);
 
                     let is_validator = is_validator_function(chan.clone());
                     bs.set_validator(is_validator);
 
                     bs.start();
-                    p2p_svc.lock().set_network_name(config.network_name);
+                    p2p_svc.lock().set_network_name(net_name);
                     p2p_svc.lock().start();
                 });
                 p2p_start = false;
@@ -404,11 +428,18 @@ impl App {
                 info!("{} TRANSACTION IN BOOTSTRAP", bootstrap_txs.len()); // DELETEME
                 self.put_txs_in_the_pool(bootstrap_txs);
 
-                bootstrap_monitor(chan.clone(), wm);
+                bootstrap_monitor(chan.clone(), wm); // Blocking function
 
-                let network_name = self.set_config_from_service(&chan.clone());
+                let mut config = load_config_from_service(&chan);
 
-                let is_validator = is_validator_function(chan.clone());
+                config.network_name = Some(good_network_name);
+
+                // Store the configuration on the DB
+                self.store_config_into_db(config);
+
+                let network_name = self.set_config_from_db();
+
+                let is_validator = is_validator_function(chan);
                 self.set_block_service_is_validator(is_validator);
 
                 self.p2p_svc.lock().set_network_name(network_name);
