@@ -20,17 +20,19 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use trinci_core::base::BlockchainSettings;
 use trinci_core::crypto::{Hash, HashAlgorithm};
-use trinci_core::db::Db;
 
 use trinci_core::{
-    base::{serialize::rmp_deserialize, Mutex},
+    base::{
+        serialize::{rmp_deserialize, rmp_serialize},
+        Mutex, RwLock,
+    },
     blockchain::{BlockConfig, BlockRequestSender, BlockService, Event, Message},
     bridge::{BridgeConfig, BridgeService},
     crypto::{ed25519::KeyPair as ed25519KeyPair, ed25519::PublicKey as ed25519PublicKey, KeyPair},
-    db::RocksDb,
+    db::{Db, RocksDb, RocksDbFork},
     p2p::{service::PeerConfig, PeerService},
     rest::{RestConfig, RestService},
-    wm::{WasmLoader, WmLocal},
+    wm::{WasmLoader, Wm, WmLocal},
     Error, ErrorKind, Transaction,
 };
 /// Application context.
@@ -78,27 +80,31 @@ fn is_validator_function_temporary(value: bool) -> impl IsValidator {
 }
 
 /// Method to check if the node is a current validator
-fn is_validator_function(chan: BlockRequestSender) -> impl IsValidator {
+fn is_validator_function_call(
+    wm: Arc<Mutex<dyn Wm>>,
+    db: Arc<RwLock<dyn Db<DbForkType = RocksDbFork>>>,
+) -> impl IsValidator {
     move |account_id: String| {
-        let mut validators_key = String::from("blockchain:validators:");
-        validators_key.push_str(&account_id);
+        let args = rmp_serialize(&account_id)?;
 
-        let req = Message::GetAccountRequest {
-            id: SERVICE_ACCOUNT_ID.to_string(),
-            data: vec![validators_key],
-        };
-        let res_chan = chan.send_sync(req).unwrap();
-        match res_chan.recv_sync() {
-            Ok(Message::GetAccountResponse { acc: _, mut data }) => {
-                if data.is_empty() || data[0].is_none() {
-                    Ok(false)
-                } else {
-                    rmp_deserialize::<bool>(&data[0].take().unwrap())
-                }
-            }
-            Ok(Message::Exception(err)) => Err(err),
-            _ => Err(Error::new(ErrorKind::Other)),
-        }
+        let mut db = db.write().fork_create();
+
+        let mut events = Vec::new();
+
+        let res = wm.lock().call(
+            &mut db,
+            42,
+            "",
+            "",
+            SERVICE_ACCOUNT_ID,
+            "",
+            None,
+            "is_validator",
+            &args,
+            &mut events,
+        )?;
+
+        rmp_deserialize(&res)
     }
 }
 
@@ -215,8 +221,6 @@ fn load_config_from_service(chan: &BlockRequestSender) -> BlockchainSettings {
         Ok(Message::GetAccountResponse { acc: _, data }) => {
             let data = data.get(0).unwrap().as_ref().unwrap(); // The unwrap propagates the panic!
 
-            println!("SETTINGS: {:?}", data);
-
             match rmp_deserialize::<BlockchainSettings>(data) {
                 Ok(value) => value,
                 Err(_) => panic!("Settings deserialization failure"),
@@ -312,7 +316,7 @@ impl App {
         let config = rmp_deserialize::<BlockchainSettings>(&buf).unwrap(); // If this fails is at the very beginning
 
         let network_name = config.network_name.clone().unwrap(); // If this fails is at the very beginning
-        warn!("network name: {:?}", network_name); // DELETEME
+        warn!("network name: {:?}", network_name);
         self.set_block_service_config(config);
         network_name
     }
@@ -348,21 +352,21 @@ impl App {
 
         let chan = self.block_svc.lock().request_channel();
         if is_service_present(&chan) {
-            info!("SERVICE PRESENT"); // DELETEME
             let network_name = self.set_config_from_db();
 
-            let loader = blockchain_loader(chan.clone());
+            let loader = blockchain_loader(chan);
             self.block_svc.lock().wm_arc().lock().set_loader(loader);
 
-            let is_validator = is_validator_function(chan);
+            let wm = self.block_svc.lock().wm_arc();
+            let db = self.block_svc.lock().db_arc();
+
+            let is_validator = is_validator_function_call(wm, db);
 
             self.set_block_service_is_validator(is_validator);
 
             self.p2p_svc.lock().set_network_name(network_name);
             p2p_start = true;
         } else {
-            info!("SERVICE NOT PRESENT: LOADING FROM FILE"); // DELETEME
-
             // Load the Boostrap Struct from file
             let (good_network_name, bootstrap_bin, bootstrap_txs) =
                 load_bootstrap_struct_from_file(&self.bootstrap_path);
@@ -393,16 +397,17 @@ impl App {
             let p2p_svc = self.p2p_svc.clone();
 
             if bootstrap_txs.is_empty() {
-                info!("NO TRANSACTION IN BOOTSTRAP"); // DELETEME
-                let chan_bootstrap = chan.clone();
+                let wm = self.block_svc.lock().wm_arc();
+                let db = self.block_svc.lock().db_arc();
+
                 std::thread::spawn(move || {
-                    bootstrap_monitor(chan_bootstrap.clone(), wm);
+                    bootstrap_monitor(chan.clone(), wm.clone());
 
                     let mut bs = block_svc.lock();
-                    let mut config = load_config_from_service(&chan_bootstrap.clone());
+                    let mut config = load_config_from_service(&chan.clone());
 
                     config.network_name = Some(good_network_name);
-                    warn!("network name: {:?}", config.network_name); // DELETEME
+                    warn!("network name: {:?}", config.network_name);
                     bs.stop();
 
                     let net_name = config.network_name.clone().unwrap(); // This shall not fail
@@ -416,7 +421,7 @@ impl App {
                     // Store the configuration on the DB
                     bs.store_config_into_db(config);
 
-                    let is_validator = is_validator_function(chan.clone());
+                    let is_validator = is_validator_function_call(wm.clone(), db.clone());
                     bs.set_validator(is_validator);
 
                     bs.start();
@@ -425,7 +430,6 @@ impl App {
                 });
                 p2p_start = false;
             } else {
-                info!("{} TRANSACTION IN BOOTSTRAP", bootstrap_txs.len()); // DELETEME
                 self.put_txs_in_the_pool(bootstrap_txs);
 
                 bootstrap_monitor(chan.clone(), wm); // Blocking function
@@ -439,7 +443,11 @@ impl App {
 
                 let network_name = self.set_config_from_db();
 
-                let is_validator = is_validator_function(chan);
+                let wm = self.block_svc.lock().wm_arc();
+                let db = self.block_svc.lock().db_arc();
+
+                let is_validator = is_validator_function_call(wm, db);
+
                 self.set_block_service_is_validator(is_validator);
 
                 self.p2p_svc.lock().set_network_name(network_name);
@@ -510,7 +518,7 @@ mod tests {
     #[test]
     #[ignore = "this is a temporary way to create bootstrap.bin"]
     fn create_bootstrap_bin() {
-        let mut bootstrap_file = std::fs::File::open("./bootstrap.wasm").unwrap();
+        let mut bootstrap_file = std::fs::File::open("./service.wasm").unwrap();
         let mut bootstrap = Vec::new();
         std::io::Read::read_to_end(&mut bootstrap_file, &mut bootstrap).expect("loading bootstrap");
 
