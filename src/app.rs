@@ -20,14 +20,17 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 use trinci_core::{
-    base::{serialize::rmp_deserialize, Mutex},
+    base::{
+        serialize::{rmp_deserialize, rmp_serialize},
+        Mutex, RwLock,
+    },
     blockchain::{BlockConfig, BlockRequestSender, BlockService, Event, Message},
     bridge::{BridgeConfig, BridgeService},
     crypto::{ed25519::KeyPair as ed25519KeyPair, ed25519::PublicKey as ed25519PublicKey, KeyPair},
-    db::RocksDb,
+    db::{Db, RocksDb, RocksDbFork},
     p2p::{service::PeerConfig, PeerService},
     rest::{RestConfig, RestService},
-    wm::{WasmLoader, WmLocal},
+    wm::{WasmLoader, Wm, WmLocal},
     Error, ErrorKind, Transaction,
 };
 /// Application context.
@@ -75,29 +78,70 @@ fn is_validator_function_temporary(value: bool) -> impl IsValidator {
 }
 
 /// Method to check if the node is a current validator
-fn is_validator_function(chan: BlockRequestSender) -> impl IsValidator {
+fn is_validator_function_call(
+    wm: Arc<Mutex<dyn Wm>>,
+    db: Arc<RwLock<dyn Db<DbForkType = RocksDbFork>>>,
+) -> impl IsValidator {
     move |account_id: String| {
-        let mut validators_key = String::from("blockchain:validators:");
-        validators_key.push_str(&account_id);
+        error!("is_validator_function_call:001");
+        let args = rmp_serialize(&account_id)?;
+        error!("is_validator_function_call:002");
+        let mut db = db.write().fork_create();
+        error!("is_validator_function_call:003");
+        let mut events = Vec::new();
+        error!("is_validator_function_call:004");
+        let res = wm.lock().call(
+            &mut db,
+            42,
+            "",
+            "",
+            SERVICE_ACCOUNT_ID,
+            "",
+            None,
+            "is_validator",
+            &args,
+            &mut events,
+        );
+        error!("is_validator_function_call:res:{:?}", res);
+        let res = res?;
 
-        let req = Message::GetAccountRequest {
-            id: SERVICE_ACCOUNT_ID.to_string(),
-            data: vec![validators_key],
-        };
-        let res_chan = chan.send_sync(req).unwrap();
-        match res_chan.recv_sync() {
-            Ok(Message::GetAccountResponse { acc: _, mut data }) => {
-                if data.is_empty() || data[0].is_none() {
-                    Ok(false)
-                } else {
-                    rmp_deserialize::<bool>(&data[0].take().unwrap())
-                }
-            }
-            Ok(Message::Exception(err)) => Err(err),
-            _ => Err(Error::new(ErrorKind::Other)),
+        error!("is_validator_function_call:005");
+        let res: bool = rmp_deserialize(&res)?;
+        error!("is_validator_function_call:006");
+        if res {
+            error!("IS_VALIDATOR: TRUE");
+        } else {
+            error!("IS_VALIDATOR: FALSE");
         }
+        error!("is_validator_function_call:007");
+        Ok(res)
     }
 }
+
+// /// Method to check if the node is a current validator
+// fn is_validator_function(chan: BlockRequestSender) -> impl IsValidator {
+//     move |account_id: String| {
+//         let mut validators_key = String::from("blockchain:validators:");
+//         validators_key.push_str(&account_id);
+
+//         let req = Message::GetAccountRequest {
+//             id: SERVICE_ACCOUNT_ID.to_string(),
+//             data: vec![validators_key],
+//         };
+//         let res_chan = chan.send_sync(req).unwrap();
+//         match res_chan.recv_sync() {
+//             Ok(Message::GetAccountResponse { acc: _, mut data }) => {
+//                 if data.is_empty() || data[0].is_none() {
+//                     Ok(false)
+//                 } else {
+//                     rmp_deserialize::<bool>(&data[0].take().unwrap())
+//                 }
+//             }
+//             Ok(Message::Exception(err)) => Err(err),
+//             _ => Err(Error::new(ErrorKind::Other)),
+//         }
+//     }
+// }
 
 /// Smart contracts loader that is used during the bootstrap phase.
 /// This loader unconditionally loads the "bootstrap" contract and ignores the
@@ -339,7 +383,11 @@ impl App {
             let loader = blockchain_loader(chan.clone());
             self.block_svc.lock().wm_arc().lock().set_loader(loader);
 
-            let is_validator = is_validator_function(chan.clone());
+            // let is_validator = is_validator_function(chan.clone());
+            let wm = self.block_svc.lock().wm_arc();
+            let db = self.block_svc.lock().db_arc();
+
+            let is_validator = is_validator_function_call(wm, db);
 
             self.set_block_service_is_validator(is_validator);
 
@@ -379,8 +427,12 @@ impl App {
             if bootstrap_txs.is_empty() {
                 info!("NO TRANSACTION IN BOOTSTRAP"); // DELETEME
                 let chan_bootstrap = chan.clone();
+                let wm = self.block_svc.lock().wm_arc();
+                let db = self.block_svc.lock().db_arc();
+
+                // let is_validator = is_validator_function_call(wm, db);
                 std::thread::spawn(move || {
-                    bootstrap_monitor(chan_bootstrap.clone(), wm);
+                    bootstrap_monitor(chan_bootstrap.clone(), wm.clone());
 
                     let mut bs = block_svc.lock();
                     let config = load_config_from_service(&chan_bootstrap.clone());
@@ -391,8 +443,11 @@ impl App {
                         config.block_threshold,
                         config.block_timeout,
                     );
+                    // let wm = self.block_svc.lock().wm_arc();
+                    // let db = self.block_svc.lock().db_arc();
 
-                    let is_validator = is_validator_function(chan.clone());
+                    let is_validator = is_validator_function_call(wm.clone(), db.clone());
+                    // let is_validator = is_validator_function(chan.clone());
                     bs.set_validator(is_validator);
 
                     bs.start();
@@ -408,7 +463,12 @@ impl App {
 
                 let network_name = self.set_config_from_service(&chan.clone());
 
-                let is_validator = is_validator_function(chan.clone());
+                let wm = self.block_svc.lock().wm_arc();
+                let db = self.block_svc.lock().db_arc();
+
+                let is_validator = is_validator_function_call(wm, db);
+                // let is_validator = is_validator_function(chan.clone());
+
                 self.set_block_service_is_validator(is_validator);
 
                 self.p2p_svc.lock().set_network_name(network_name);
