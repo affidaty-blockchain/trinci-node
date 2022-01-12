@@ -17,6 +17,7 @@ keypair-path = "ed25519_keypair.bin"
 # Node bootstrap file in WASM format.
 # Default: "bootstrap.bin"
 bootstrap-path = "bootstrap.bin"
+#bootstrap-path = "service.wasm"
 
 # Network indentifier.
 # Default: "skynet".

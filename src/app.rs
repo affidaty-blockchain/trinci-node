@@ -305,6 +305,9 @@ impl App {
             config.block_threshold,
             config.block_timeout,
         );
+        self.block_svc
+            .lock()
+            .set_burn_fuel_method(config.burning_fuel_method);
         self.block_svc.lock().start();
     }
 
@@ -318,6 +321,7 @@ impl App {
         let network_name = config.network_name.clone().unwrap(); // If this fails is at the very beginning
         warn!("network name: {:?}", network_name);
         self.set_block_service_config(config);
+
         network_name
     }
 
@@ -387,10 +391,11 @@ impl App {
             };
 
             self.set_block_service_config(BlockchainSettings {
-                network_name: Some("bootstrap".to_string()),
                 accept_broadcast: false,
                 block_threshold,
-                block_timeout: 2, // The genesis block will be executed after this timeout and not with block_threshold transactions in the pool // FIXME
+                block_timeout: 2,
+                burning_fuel_method: String::new(),
+                network_name: Some("bootstrap".to_string()), // The genesis block will be executed after this timeout and not with block_threshold transactions in the pool // FIXME
             });
 
             let block_svc = self.block_svc.clone();
@@ -417,6 +422,9 @@ impl App {
                         config.block_threshold,
                         config.block_timeout,
                     );
+
+                    // Set the burn fuel method name
+                    bs.set_burn_fuel_method(config.burning_fuel_method.clone());
 
                     // Store the configuration on the DB
                     bs.store_config_into_db(config);
