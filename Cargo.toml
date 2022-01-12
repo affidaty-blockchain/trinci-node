@@ -14,6 +14,8 @@ toml = "0.5.8"
 simplelog = "0.11.1"
 hex = "0.4.3"
 serde-value = { git = "https://github.com/affidaty-blockchain/serde-value", branch = "helper_macro" }
+# base58 for network name calculation
+bs58 = "0.4.0"
 rand = "0.8.4"
 tempfile = "3.2.0"
 # Serialization 
