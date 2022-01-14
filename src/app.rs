@@ -197,7 +197,7 @@ fn load_bootstrap_struct_from_file(path: &str) -> (String, Vec<u8>, Vec<Transact
 
     match rmp_deserialize::<Bootstrap>(&buf) {
         Ok(bs) => (calculate_network_name(&buf), bs.bin, bs.txs),
-        Err(_) => (String::from(""), buf, vec![]),
+        Err(_) => (calculate_network_name(&buf), buf, vec![]),
     }
 }
 #[derive(Serialize, Deserialize)]
