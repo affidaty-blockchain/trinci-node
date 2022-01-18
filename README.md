@@ -9,8 +9,9 @@ The required dependencies to build correctly the project are the following:
 
 - clang
 - libclang-dev (ver. 11 suggested)
-
-follow the installations for the most common Unix/Linux systems 
+- libssl-dev
+- pkg-config
+- build-essential
 
 ## preparatory steps
 
