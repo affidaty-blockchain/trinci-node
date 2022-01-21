@@ -28,7 +28,7 @@ use trinci_core::{
     },
     blockchain::{BlockConfig, BlockRequestSender, BlockService, Event, Message},
     bridge::{BridgeConfig, BridgeService},
-    crypto::{ed25519::KeyPair as ed25519KeyPair, ed25519::PublicKey as ed25519PublicKey, KeyPair},
+    crypto::{ed25519::KeyPair as Ed25519KeyPair, ed25519::PublicKey as Ed25519PublicKey, KeyPair},
     db::{Db, RocksDb, RocksDbFork},
     p2p::{service::PeerConfig, PeerService},
     rest::{RestConfig, RestService},
@@ -48,7 +48,7 @@ pub struct App {
     /// Keypair placeholder.
     pub keypair: Arc<KeyPair>,
     /// p2p Keypair placeholder
-    pub p2p_public_key: ed25519PublicKey,
+    pub p2p_public_key: Ed25519PublicKey,
     /// Bootstrap path
     pub bootstrap_path: String,
 }
@@ -268,8 +268,8 @@ impl App {
         };
         let rest_svc = RestService::new(rest_config, chan.clone());
 
-        let p2p_keypair = ed25519KeyPair::from_random();
-        let p2p_public_key: ed25519PublicKey = p2p_keypair.public_key();
+        let p2p_keypair = Ed25519KeyPair::from_random();
+        let p2p_public_key: Ed25519PublicKey = p2p_keypair.public_key();
 
         let p2p_config = PeerConfig {
             addr: config.p2p_addr.clone(),
@@ -500,6 +500,7 @@ impl App {
 mod tests {
     use crate::app::Bootstrap;
     use glob::glob;
+    use trinci_core::crypto::ed25519::KeyPair as Ed25519KeyPair;
     use trinci_core::{base::serialize::rmp_deserialize, Message};
 
     #[test]
@@ -560,5 +561,14 @@ mod tests {
         let bootstrap_buf = trinci_core::base::serialize::rmp_serialize(&bootstrap_bin).unwrap();
 
         std::fs::write("bootstrap.bin", bootstrap_buf).unwrap();
+    }
+
+    #[ignore = "use this to create a new ed25519 keypair"]
+    #[test]
+    fn create_ed25519_keypair() {
+        let ed25519_keypair = Ed25519KeyPair::from_random();
+        let bin = ed25519_keypair.to_bytes();
+        println! {"Account id: {}", ed25519_keypair.public_key().to_account_id()};
+        std::fs::write("keypair.bin", bin).unwrap();
     }
 }
