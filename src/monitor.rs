@@ -65,7 +65,7 @@ pub struct P2pInfo {
 pub struct NetworkConfig {
     pub name: String,
     // it should be the bootstrap hash
-    //network_id: Hash, todo!()
+    //name: String, todo!()
     pub block_threshold: usize,
     pub block_timeout: u16,
 }
@@ -317,6 +317,26 @@ pub fn run(monitor: &mut Monitor, tx_chan: BlockRequestSender, addr: &str, file:
 
     loop {
         sleep(Duration::new(60 * 5, 0));
+
+        let request = Message::GetNetworkIdRequest;
+        let rx_chan = match tx_chan.send_sync(request) {
+            Ok(rx_chan) => rx_chan,
+            Err(_error) => {
+                warn!("[monitor] blockchain channel closed");
+                return;
+            }
+        };
+
+        match rx_chan.recv_sync() {
+            Ok(Message::GetNetworkIdResponse(info)) => monitor.data.nw_config.name = info,
+            Ok(res) => {
+                warn!("[monitor] unexpected message {:?}", res);
+            }
+            Err(_error) => {
+                warn!("[monitor] blockchain channel closed");
+                break;
+            }
+        }
 
         let request = Message::GetCoreStatsRequest;
         let rx_chan = match tx_chan.send_sync(request) {

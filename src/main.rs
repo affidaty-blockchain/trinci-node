@@ -137,7 +137,7 @@ fn main() {
             role: monitor::NodeRole::Ordinary, // FIXME
             nw_config: monitor::NetworkConfig {
                 name: config.network,
-                //network_id: todo!(),
+                //name: todo!(),
                 block_threshold: config.block_threshold,
                 block_timeout: config.block_timeout,
             },
