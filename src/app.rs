@@ -277,6 +277,7 @@ impl App {
             network: Mutex::new(config.network.clone()),
             bootstrap_addr: config.p2p_bootstrap_addr.clone(),
             p2p_keypair: Some(p2p_keypair),
+            active: !config.test_mode,
         };
         let p2p_svc = PeerService::new(p2p_config, chan.clone());
 
