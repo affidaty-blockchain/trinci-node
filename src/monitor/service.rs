@@ -15,9 +15,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with TRINCI. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::app::Arc;
-use crate::monitor::worker::MonitorWorker;
-use std::thread::JoinHandle;
+use crate::monitor::worker::{MonitorConfig, MonitorWorker};
+use std::{
+    sync::Arc,
+    thread::{self, JoinHandle},
+};
+use trinci_core::blockchain::BlockRequestSender;
 
 pub struct MonitorService {
     /// Worker object
@@ -29,7 +32,7 @@ pub struct MonitorService {
 }
 
 impl MonitorService {
-    pub fn new() -> Self {
+    pub fn new(config: MonitorConfig, bc_chan: BlockRequestSender) -> Self {
         let worker = MonitorWorker::new(config, bc_chan);
 
         MonitorService {
@@ -40,7 +43,7 @@ impl MonitorService {
     }
 
     /// Start monitor service if not already running
-    pub fn start(&mut self) {
+    pub fn start(&mut self, addr: String, file: String) {
         debug!("Starting MONITOR service");
 
         let mut worker = match self.worker.take() {
@@ -54,7 +57,7 @@ impl MonitorService {
         let mut canary = Arc::clone(&self.canary);
         let handle = thread::spawn(move || {
             let _ = Arc::get_mut(&mut canary);
-            worker.run(); // it was run_sync() in bridge
+            worker.run(addr, file); // it was run_sync() in bridge
             worker
         });
         self.handler = Some(handle)
@@ -72,7 +75,7 @@ impl MonitorService {
     }
 }
 
-#[cfg(test)]
-mod test {
-    todo!();
-}
+//#[cfg(test)]
+//mod test {
+//    todo!();
+//}

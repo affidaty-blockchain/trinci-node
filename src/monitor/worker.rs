@@ -108,14 +108,14 @@ pub struct Status {
 /// It holds the node informations
 #[derive(Serialize)]
 #[allow(non_snake_case)]
-struct MonitorConfig {
-    nodeID: String,
-    data: Status,
+pub struct MonitorConfig {
+    pub(crate) nodeID: String,
+    pub(crate) data: Status,
 }
 
 pub struct MonitorWorker {
     config: MonitorConfig,
-    bc_chan: BlockRequestSender, // check if correct
+    bc_chan: BlockRequestSender,
 }
 
 impl MonitorWorker {
@@ -125,16 +125,17 @@ impl MonitorWorker {
 
     /// Updates node status
     fn update(&mut self, block: Option<Block>, unconfirmed_pool: Option<UnconfirmedPool>) {
-        self.data.unconfirmed_pool = unconfirmed_pool;
+        self.config.data.unconfirmed_pool = unconfirmed_pool;
 
         if let Some(block) = block {
             let hash = block.hash(HashAlgorithm::Sha256);
             let last_block = LastBlock { block, hash };
-            self.data.last_block = Some(last_block);
+            self.config.data.last_block = Some(last_block);
         }
     }
 
-    fn send_update(&mut self, addr: &str) {
+    /// Send json structure containing node status to the `addr`
+    fn send_update(&mut self, addr: String) {
         let request = match serde_json::to_string(&self.config) {
             Ok(request) => request,
             Err(_error) => {
@@ -162,7 +163,8 @@ impl MonitorWorker {
         }
     }
 
-    fn save_update(&mut self, file: &str) {
+    /// Saves node status in a human readable format in the `file` specified
+    fn save_update(&mut self, file: String) {
         // write structure in file
         let mut columns = BTreeMap::new();
         let column_field = Column {
@@ -321,14 +323,14 @@ impl MonitorWorker {
 
     /// Run monitor, it saves every 5 minutes the node status in `file`
     /// and sends a his json representation to `addr`
-    pub fn run(&mut self, addr: &str, file: &str) {
+    pub fn run(&mut self, addr: String, file: String) {
         debug!("[monitor] running, monitor data updated every 5 min");
 
         loop {
             sleep(Duration::new(60 * 5, 0));
 
             let request = Message::GetCoreStatsRequest;
-            let rx_chan = match self.tx_chan.send_sync(request) {
+            let rx_chan = match self.bc_chan.send_sync(request) {
                 Ok(rx_chan) => rx_chan,
                 Err(_error) => {
                     warn!("[monitor] blockchain channel closed");
@@ -348,8 +350,8 @@ impl MonitorWorker {
                         self.update(info.2, None)
                     }
 
-                    self.send_update(addr);
-                    self.save_update(file);
+                    self.send_update(addr.clone());
+                    self.save_update(file.clone());
                 }
                 Ok(res) => {
                     warn!("[monitor] unexpected message {:?}", res);
@@ -363,7 +365,7 @@ impl MonitorWorker {
     }
 }
 
-fn get_ip() -> String {
+pub(crate) fn get_ip() -> String {
     let mut dig = Command::new("sh");
     dig.arg("-c")
         .arg("dig TXT +short o-o.myaddr.l.google.com @ns1.google.com");

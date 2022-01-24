@@ -15,6 +15,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with TRINCI. If not, see <https://www.gnu.org/licenses/>.
 
+use crate::monitor;
+use crate::monitor::service::MonitorService;
+use crate::monitor::worker::MonitorConfig;
 use crate::{config::Config, config::SERVICE_ACCOUNT_ID};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -45,6 +48,8 @@ pub struct App {
     pub p2p_svc: Arc<Mutex<PeerService>>,
     /// Bridge service context.
     pub bridge_svc: BridgeService,
+    /// Monitor service context.
+    pub monitor_svc: Option<MonitorService>,
     /// Keypair placeholder.
     pub keypair: Arc<KeyPair>,
     /// p2p Keypair placeholder
@@ -284,7 +289,44 @@ impl App {
             addr: config.bridge_addr,
             port: config.bridge_port,
         };
-        let bridge_svc = BridgeService::new(bridge_config, chan);
+        let bridge_svc = BridgeService::new(bridge_config, chan.clone());
+
+        let monitor_svc: Option<MonitorService> = None;
+        // block chain monitor
+        #[cfg(feature = "monitor")]
+        let monitor_svc = {
+            let nw_public_key = p2p_public_key.to_account_id();
+            let public_ip = monitor::worker::get_ip();
+
+            let node_status = monitor::worker::Status {
+                public_key: keypair.public_key().to_account_id(), // check if ok
+                nw_public_key,
+                ip_endpoint: None,
+                role: monitor::worker::NodeRole::Ordinary, // FIXME
+                nw_config: monitor::worker::NetworkConfig {
+                    name: config.network,
+                    //network_id: todo!(),
+                    block_threshold: config.block_threshold,
+                    block_timeout: config.block_timeout,
+                },
+                core_version: trinci_core::VERSION.to_string(),
+                last_block: None,
+                unconfirmed_pool: None,
+                p2p_info: monitor::worker::P2pInfo {
+                    p2p_addr: config.p2p_addr,
+                    p2p_port: config.p2p_port,
+                    p2p_bootstrap_addr: config.p2p_bootstrap_addr,
+                },
+                pub_ip: public_ip,
+            };
+
+            let monitor_config = MonitorConfig {
+                nodeID: keypair.public_key().to_account_id(),
+                data: node_status,
+            };
+
+            MonitorService::new(monitor_config, chan)
+        };
 
         App {
             block_svc: Arc::new(Mutex::new(block_svc)),
@@ -294,6 +336,7 @@ impl App {
             p2p_public_key,
             bootstrap_path: config.bootstrap_path,
             keypair,
+            monitor_svc: Some(monitor_svc),
         }
     }
 
@@ -345,7 +388,7 @@ impl App {
     /// Spawn a temporary thread that takes care of "service" account creation.
     /// Once that the service account is created, the thread takes care to set the
     /// main smart contracts loader within the wasm machine.
-    pub fn start(&mut self) {
+    pub fn start(&mut self, file: Option<String>, addr: Option<String>) {
         let p2p_start;
 
         self.block_svc.lock().start();
@@ -462,6 +505,13 @@ impl App {
             self.p2p_svc.lock().start();
         }
         self.bridge_svc.start();
+
+        #[cfg(feature = "monitor")]
+        {
+            let addr: String = addr.unwrap();
+            let file: String = file.unwrap();
+            self.monitor_svc.as_mut().unwrap().start(addr, file);
+        }
     }
 
     pub fn park(&mut self) {
@@ -489,6 +539,8 @@ impl App {
                 self.rest_svc.stop();
                 self.p2p_svc.lock().stop();
                 self.bridge_svc.stop();
+                #[cfg(feature = "monitor")]
+                self.monitor_svc.as_mut().unwrap().stop();
                 break;
             }
         }

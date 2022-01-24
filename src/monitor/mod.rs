@@ -16,4 +16,4 @@
 // along with TRINCI. If not, see <https://www.gnu.org/licenses/>.
 
 pub mod service;
-mod worker;
+pub(crate) mod worker;
