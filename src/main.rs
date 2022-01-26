@@ -104,7 +104,7 @@ fn main() {
     info!("Node ID: {}", keypair.public_key().to_account_id());
 
     #[cfg(feature = "monitor")]
-    let (node_id, public_key) = {
+    let (_node_id, _public_key) = {
         (
             keypair.public_key().to_account_id(),
             match keypair.public_key() {
@@ -114,8 +114,8 @@ fn main() {
         )
     };
 
-    let addr: Option<String> = None;
-    let file: Option<String> = None;
+    #[cfg(not(feature = "monitor"))]
+    let (addr, file) = { (None::<String>, None::<String>) };
     #[cfg(feature = "monitor")]
     let (addr, file) = {
         (

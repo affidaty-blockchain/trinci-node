@@ -291,6 +291,7 @@ impl App {
         };
         let bridge_svc = BridgeService::new(bridge_config, chan.clone());
 
+        #[cfg(not(feature = "monitor"))]
         let monitor_svc: Option<MonitorService> = None;
         // block chain monitor
         #[cfg(feature = "monitor")]
@@ -533,6 +534,13 @@ impl App {
             if !self.bridge_svc.is_running() {
                 error!("Bridge service is not running");
                 stop = true;
+            }
+            #[cfg(feature = "monitor")]
+            {
+                if !self.monitor_svc.as_mut().unwrap().is_running() {
+                    error!("Monitor service is not running");
+                    stop = true;
+                }
             }
             if stop {
                 self.block_svc.lock().stop();
