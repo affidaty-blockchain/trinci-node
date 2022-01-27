@@ -112,6 +112,8 @@ pub struct Config {
     pub monitor_file: String,
     /// monitor addr
     pub monitor_addr: String,
+    /// Test mode
+    pub test_mode: bool,
 }
 
 impl Default for Config {
@@ -134,6 +136,7 @@ impl Default for Config {
             wm_cache_max: DEFAULT_WM_CACHE_MAX,
             monitor_file: DEFAULT_MONITOR_FILE.to_string(),
             monitor_addr: DEFAULT_MONITOR_ADDR.to_string(),
+            test_mode: false,
         }
     }
 }
@@ -163,9 +166,6 @@ impl Config {
         }
         if let Some(value) = map.get("keypair-path").and_then(|value| value.as_str()) {
             config.keypair_path = Some(value.to_owned())
-        }
-        if let Some(value) = map.get("network").and_then(|value| value.as_str()) {
-            config.network = value.to_owned();
         }
         if let Some(value) = map.get("rest-addr").and_then(|value| value.as_str()) {
             config.rest_addr = value.to_owned();
@@ -212,7 +212,9 @@ impl Config {
         if let Some(value) = map.get("wm-cache-max").and_then(|value| value.as_integer()) {
             config.wm_cache_max = value as usize;
         }
-
+        if let Some(value) = map.get("test-mode").and_then(|value| value.as_bool()) {
+            config.test_mode = value;
+        }
         Some(config)
     }
 }
@@ -237,16 +239,6 @@ pub fn create_app_config() -> Config {
                 .value_name("LEVEL")
                 .required(false)
                 .possible_values(&["off", "error", "warn", "info", "debug", "trace"]),
-        )
-        .arg(
-            clap::Arg::with_name("network")
-                .long("network")
-                .help(&format!(
-                    "Blockchain network identifier (default '{}')",
-                    DEFAULT_NETWORK_ID
-                ))
-                .value_name("NETWORK-NAME")
-                .required(false),
         )
         .arg(
             clap::Arg::with_name("db-path")
@@ -328,6 +320,12 @@ pub fn create_app_config() -> Config {
                 .value_name("ADDRESS")
                 .required(false),
         )
+        .arg(
+            clap::Arg::with_name("test-mode")
+            .short("t")
+            .long("test-mode")
+            .help("Test mode - the kad network is not started")
+        )
         .get_matches();
 
     let config_file = matches.value_of("config").unwrap_or(DEFAULT_CONFIG_FILE);
@@ -381,6 +379,9 @@ pub fn create_app_config() -> Config {
     }
     if let Some(value) = matches.value_of("monitor-addr") {
         config.monitor_addr = value.to_owned();
+    }
+    if matches.is_present("test-mode") {
+        config.test_mode = true;
     }
     config
 }
@@ -449,6 +450,7 @@ mod tests {
             monitor_file: "blackbox.info".to_string(),
             monitor_addr: "https://dev.exchange.affidaty.net/api/v1/nodesMonitor/update"
                 .to_string(),
+            test_mode: false,
         }
     }
 

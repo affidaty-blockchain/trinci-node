@@ -86,6 +86,9 @@ fn show_config(config: &Config) {
         "  P2P bootstrap address:  {}",
         config.p2p_bootstrap_addr.clone().unwrap_or_default()
     );
+    if config.test_mode {
+        info!("  Test mode:  Active");
+    }
 }
 
 fn main() {
