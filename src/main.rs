@@ -104,7 +104,7 @@ fn main() {
     info!("Node ID: {}", keypair.public_key().to_account_id());
 
     #[cfg(feature = "monitor")]
-    let (node_id, public_key) = {
+    let (_node_id, _public_key) = {
         (
             keypair.public_key().to_account_id(),
             match keypair.public_key() {
@@ -114,51 +114,21 @@ fn main() {
         )
     };
 
+    #[cfg(not(feature = "monitor"))]
+    let (addr, file) = { (None::<String>, None::<String>) };
+    #[cfg(feature = "monitor")]
+    let (addr, file) = {
+        (
+            Some(config.monitor_addr.clone()),
+            Some(config.monitor_file.clone()),
+        )
+    };
     let mut app = App::new(config, keypair);
-    app.start();
+    app.start(file, addr);
 
     // Temporary blockchain "stuff" tracer.
     let chan = app.block_svc.lock().request_channel();
     std::thread::spawn(move || tracer::run(chan));
-
-    // block chain monitor
-    #[cfg(feature = "monitor")]
-    {
-        debug!("[monitor] monitor started");
-        let config = config::create_app_config();
-
-        let nw_public_key = app.p2p_public_key.to_account_id();
-        let public_ip = monitor::get_ip();
-
-        let node_status = monitor::Status {
-            public_key,
-            nw_public_key,
-            ip_endpoint: None,
-            role: monitor::NodeRole::Ordinary, // FIXME
-            nw_config: monitor::NetworkConfig {
-                name: config.network,
-                //name: todo!(),
-                block_threshold: config.block_threshold,
-                block_timeout: config.block_timeout,
-            },
-            core_version: trinci_core::VERSION.to_string(),
-            last_block: None,
-            unconfirmed_pool: None,
-            p2p_info: monitor::P2pInfo {
-                p2p_addr: config.p2p_addr,
-                p2p_port: config.p2p_port,
-                p2p_bootstrap_addr: config.p2p_bootstrap_addr,
-            },
-            pub_ip: public_ip,
-        };
-
-        let mut monitor_struct = monitor::Monitor::new(node_id, node_status);
-        let chan = app.block_svc.lock().request_channel();
-        let addr = config.monitor_addr.clone();
-        let file = config.monitor_file;
-
-        std::thread::spawn(move || monitor::run(&mut monitor_struct, chan, &addr, &file));
-    }
 
     info!("System up and running...");
     app.park();
