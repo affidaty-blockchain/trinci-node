@@ -12,7 +12,7 @@ log-level = "debug"
 
 # Node keypair file.
 # Default: dynamically generated
-keypair-path = "ed25519_keypair.bin"
+#keypair-path = "ed25519_keypair.bin"
 
 # Node bootstrap file in WASM format.
 # Default: "bootstrap.bin"

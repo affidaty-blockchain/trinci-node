@@ -335,9 +335,6 @@ pub fn create_app_config() -> Config {
     if let Some(value) = matches.value_of("log-level") {
         config.log_level = value.to_owned();
     }
-    if let Some(value) = matches.value_of("network") {
-        config.network = value.to_owned();
-    }
     if let Some(value) = matches.value_of("db-path") {
         config.db_path = value.to_owned();
     }
@@ -434,7 +431,7 @@ mod tests {
         Config {
             log_level: "debug".to_string(),
             keypair_path: None,
-            network: "dummy_network".to_string(),
+            network: "skynet".to_string(),
             block_threshold: 1234,
             block_timeout: 4321,
             rest_addr: "1.2.3.4".to_string(),
