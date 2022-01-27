@@ -99,6 +99,8 @@ pub struct Status {
     pub unconfirmed_pool: Option<UnconfirmedPool>,
     /// infos reuarding the p2p config
     pub p2p_info: P2pInfo,
+    /// seed
+    pub seed: u64,
     // TODO
     //rcv_message_in_window: T,
 }
@@ -131,6 +133,25 @@ impl MonitorWorker {
             let hash = block.hash(HashAlgorithm::Sha256);
             let last_block = LastBlock { block, hash };
             self.config.data.last_block = Some(last_block);
+        }
+
+        // retireve seed
+        let request = Message::GetSeedRequest;
+        let rx_chan = match self.bc_chan.send_sync(request) {
+            Ok(rx_chan) => rx_chan,
+            Err(_error) => {
+                warn!("[monitor] blockchain channel closed");
+                return;
+            }
+        };
+        match rx_chan.recv_sync() {
+            Ok(Message::GetSeedRespone(seed)) => self.config.data.seed = seed,
+            Ok(res) => {
+                warn!("[monitor] unexpected message {:?}", res);
+            }
+            Err(_error) => {
+                warn!("[monitor] blockchain channel closed");
+            }
         }
     }
 
@@ -318,6 +339,12 @@ impl MonitorWorker {
                     .then(|| warn!("[monitor] error in file write"));
             }
         }
+
+        let seed: Vec<Vec<&dyn Display>> = vec![vec![&"seed", &self.config.data.seed]];
+        file.write_all(ascii_table.format(seed).as_bytes())
+            .is_err()
+            .then(|| warn!("[monitor] error in file write"));
+
         debug!("[monitor] update saved");
     }
 
@@ -325,6 +352,25 @@ impl MonitorWorker {
     /// and sends a his json representation to `addr`
     pub fn run(&mut self, addr: String, file: String) {
         debug!("[monitor] running, monitor data updated every 5 min");
+
+        // retireve network id
+        let request = Message::GetNetworkIdRequest;
+        let rx_chan = match self.bc_chan.send_sync(request) {
+            Ok(rx_chan) => rx_chan,
+            Err(_error) => {
+                warn!("[monitor] blockchain channel closed");
+                return;
+            }
+        };
+        match rx_chan.recv_sync() {
+            Ok(Message::GetNetworkIdResponse(info)) => self.config.data.nw_config.name = info,
+            Ok(res) => {
+                warn!("[monitor] unexpected message {:?}", res);
+            }
+            Err(_error) => {
+                warn!("[monitor] blockchain channel closed");
+            }
+        }
 
         loop {
             sleep(Duration::new(60 * 5, 0));

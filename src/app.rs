@@ -22,6 +22,7 @@ use crate::{config::Config, config::SERVICE_ACCOUNT_ID};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use trinci_core::base::BlockchainSettings;
+use trinci_core::crypto::drand::SeedSource;
 use trinci_core::crypto::{Hash, HashAlgorithm};
 
 use trinci_core::{
@@ -258,12 +259,29 @@ impl App {
 
         let is_validator = is_validator_function_temporary(true);
 
+        // seed initialization
+        let nonce: Vec<u8> = vec![0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
+
+        let prev_hash =
+            Hash::from_hex("1220d4ff2e94b9ba93c2bd4f5e383eeb5c5022fd4a223285629cfe2c86ed4886f730")
+                .unwrap();
+        let txs_hash =
+            Hash::from_hex("1220d4ff2e94b9ba93c2bd4f5e383eeb5c5022fd4a223285629cfe2c86ed4886f730")
+                .unwrap();
+        let rxs_hash =
+            Hash::from_hex("1220d4ff2e94b9ba93c2bd4f5e383eeb5c5022fd4a223285629cfe2c86ed4886f730")
+                .unwrap();
+        let seed = SeedSource::new(config.network.clone(), nonce, prev_hash, txs_hash, rxs_hash);
+        let seed = Arc::new(seed);
+        let seed_value = seed.get_seed();
+
         let block_svc = BlockService::new(
             &keypair.public_key().to_account_id(),
             is_validator,
             block_config,
             db,
             wm,
+            seed,
         );
         let chan = block_svc.request_channel();
 
@@ -319,6 +337,7 @@ impl App {
                     p2p_bootstrap_addr: config.p2p_bootstrap_addr,
                 },
                 pub_ip: public_ip,
+                seed: seed_value,
             };
 
             let monitor_config = MonitorConfig {
