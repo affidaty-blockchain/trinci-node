@@ -194,7 +194,7 @@ fn calculate_network_name(data: &[u8]) -> String {
     bs58::encode(hash).into_string()
 }
 
-// Load the boostrap struct from file, panic if something goes wrong
+// Load the bootstrap struct from file, panic if something goes wrong
 fn load_bootstrap_struct_from_file(path: &str) -> (String, Vec<u8>, Vec<Transaction>) {
     let mut bootstrap_file = std::fs::File::open(path).expect("bootstrap file not found");
 
@@ -209,9 +209,12 @@ fn load_bootstrap_struct_from_file(path: &str) -> (String, Vec<u8>, Vec<Transact
 #[derive(Serialize, Deserialize)]
 struct Bootstrap {
     // Binary bootstrap.wasm
+    #[serde(with = "serde_bytes")]
     bin: Vec<u8>,
     // Vec of transaction for the genesis block
     txs: Vec<Transaction>,
+    // Random string to generate unique file
+    nonce: String,
 }
 
 // If this panics, it panics early at node boot. Not a big deal.
@@ -431,7 +434,7 @@ impl App {
             self.p2p_svc.lock().set_network_name(network_name);
             p2p_start = true;
         } else {
-            // Load the Boostrap Struct from file
+            // Load the Bootstrap Struct from file
             let (good_network_name, bootstrap_bin, bootstrap_txs) =
                 load_bootstrap_struct_from_file(&self.bootstrap_path);
 
@@ -592,8 +595,9 @@ mod tests {
         let bootstrap = rmp_deserialize::<Bootstrap>(&buf);
 
         assert!(bootstrap.is_ok());
-
-        println!("{} Transactions", bootstrap.unwrap().txs.len());
+        let bootstrap = bootstrap.unwrap();
+        println!("{} Transactions", &bootstrap.txs.len());
+        println!("nonce: `{}`", &bootstrap.nonce);
     }
 
     #[test]
@@ -636,6 +640,7 @@ mod tests {
         let bootstrap_bin = Bootstrap {
             bin: bootstrap,
             txs,
+            nonce: String::from("change-me"),
         };
 
         let bootstrap_buf = trinci_core::base::serialize::rmp_serialize(&bootstrap_bin).unwrap();

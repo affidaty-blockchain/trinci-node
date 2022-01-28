@@ -1,6 +1,6 @@
 [package]
 name = "trinci-node"
-version = "0.2.5-rc1"
+version = "0.2.5"
 authors = ["The Trinci Team <trinci@affidaty.io>"]
 edition = "2021"
 description = "TRINCI blockchain node"
@@ -15,6 +15,7 @@ toml = "0.5.8"
 simplelog = "0.11.1"
 hex = "0.4.3"
 serde-value = { git = "https://github.com/affidaty-blockchain/serde-value", branch = "helper_macro" }
+serde_bytes = "0.11.5"
 # base58 for network name calculation
 bs58 = "0.4.0"
 rand = "0.8.4"

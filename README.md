@@ -62,12 +62,6 @@ cargo build
 
 # Initialization
 
-To make possible to the node to generate new blocks, run it as validator:
-
-```
-cargo run -- --validator
-```
-
 **Note:** by only running `cargo run`  it launches the node as a follower, this implies that the node can't generate blocks, but only execute those (blocks) present in the p2p network that need to be executed.
 
 # Keypair generation
