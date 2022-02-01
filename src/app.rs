@@ -15,9 +15,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with TRINCI. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::monitor;
-use crate::monitor::service::MonitorService;
-use crate::monitor::worker::MonitorConfig;
+#[cfg(feature = "monitor")]
+use crate::monitor::{self, service::MonitorService, worker::MonitorConfig};
 use crate::{config::Config, config::SERVICE_ACCOUNT_ID};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -50,6 +49,7 @@ pub struct App {
     /// Bridge service context.
     pub bridge_svc: BridgeService,
     /// Monitor service context.
+    #[cfg(feature = "monitor")]
     pub monitor_svc: Option<MonitorService>,
     /// Keypair placeholder.
     pub keypair: Arc<KeyPair>,
@@ -276,6 +276,7 @@ impl App {
                 .unwrap();
         let seed = SeedSource::new(config.network.clone(), nonce, prev_hash, txs_hash, rxs_hash);
         let seed = Arc::new(seed);
+        #[cfg(feature = "monitor")]
         let seed_value = seed.get_seed();
 
         let block_svc = BlockService::new(
@@ -313,8 +314,6 @@ impl App {
         };
         let bridge_svc = BridgeService::new(bridge_config, chan.clone());
 
-        #[cfg(not(feature = "monitor"))]
-        let monitor_svc: Option<MonitorService> = None;
         // block chain monitor
         #[cfg(feature = "monitor")]
         let monitor_svc = {
@@ -360,6 +359,7 @@ impl App {
             p2p_public_key,
             bootstrap_path: config.bootstrap_path,
             keypair,
+            #[cfg(feature = "monitor")]
             monitor_svc: Some(monitor_svc),
         }
     }
@@ -412,7 +412,7 @@ impl App {
     /// Spawn a temporary thread that takes care of "service" account creation.
     /// Once that the service account is created, the thread takes care to set the
     /// main smart contracts loader within the wasm machine.
-    pub fn start(&mut self, file: Option<String>, addr: Option<String>) {
+    pub fn start(&mut self, _file: Option<String>, _addr: Option<String>) {
         let p2p_start;
 
         self.block_svc.lock().start();
@@ -532,8 +532,8 @@ impl App {
 
         #[cfg(feature = "monitor")]
         {
-            let addr: String = addr.unwrap();
-            let file: String = file.unwrap();
+            let addr: String = _addr.unwrap();
+            let file: String = _file.unwrap();
             self.monitor_svc.as_mut().unwrap().start(addr, file);
         }
     }
