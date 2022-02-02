@@ -580,10 +580,10 @@ impl App {
 #[cfg(test)]
 mod tests {
     use crate::app::Bootstrap;
-    use glob::glob;
+    use trinci_core::base::serialize::rmp_deserialize;
     use trinci_core::crypto::ed25519::KeyPair as Ed25519KeyPair;
-    use trinci_core::{base::serialize::rmp_deserialize, Message};
 
+    #[ignore = "use this to check a boostrap file"]
     #[test]
     fn read_bootstrap_bin() {
         let mut bootstrap_file = std::fs::File::open("./bootstrap.bin").unwrap();
@@ -596,54 +596,6 @@ mod tests {
         let bootstrap = bootstrap.unwrap();
         println!("{} Transactions", &bootstrap.txs.len());
         println!("nonce: `{}`", &bootstrap.nonce);
-    }
-
-    #[test]
-    #[ignore = "this is a temporary way to create bootstrap.bin"]
-    fn create_bootstrap_bin() {
-        let mut bootstrap_file = std::fs::File::open("./service.wasm").unwrap();
-        let mut bootstrap = Vec::new();
-        std::io::Read::read_to_end(&mut bootstrap_file, &mut bootstrap).expect("loading bootstrap");
-
-        let mut txs = Vec::new();
-
-        for entry in glob("./txs/*.bin").expect("Failed to read glob pattern") {
-            match entry {
-                Ok(path) => {
-                    let filename = path.clone();
-                    let filename = filename.file_name().unwrap().to_str().unwrap();
-
-                    if !filename.starts_with("_") {
-                        let mut tx_file = std::fs::File::open(path).unwrap();
-
-                        let mut tx_bin = Vec::new();
-                        std::io::Read::read_to_end(&mut tx_file, &mut tx_bin)
-                            .expect(&format!("Error reading: {:?}", filename));
-
-                        let msg: Message = rmp_deserialize(&tx_bin).unwrap();
-
-                        let tx = match msg {
-                            Message::PutTransactionRequest { confirm: _, tx } => tx,
-                            _ => panic!("Expected put transaction request message"),
-                        };
-
-                        txs.push(tx);
-                        println!("Added tx: {}", filename);
-                    }
-                }
-                Err(e) => println!("{:?}", e),
-            }
-        }
-
-        let bootstrap_bin = Bootstrap {
-            bin: bootstrap,
-            txs,
-            nonce: String::from("change-me"),
-        };
-
-        let bootstrap_buf = trinci_core::base::serialize::rmp_serialize(&bootstrap_bin).unwrap();
-
-        std::fs::write("bootstrap.bin", bootstrap_buf).unwrap();
     }
 
     #[ignore = "use this to create a new ed25519 keypair"]

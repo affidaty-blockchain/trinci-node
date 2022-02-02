@@ -463,7 +463,7 @@ mod tests {
         Config {
             log_level: "debug".to_string(),
             keypair_path: None,
-            network: "skynet".to_string(),
+            network: "bootstrap".to_string(),
             block_threshold: 1234,
             block_timeout: 4321,
             rest_addr: "1.2.3.4".to_string(),
