@@ -225,7 +225,7 @@ impl MonitorWorker {
         let data: Vec<Vec<&dyn Display>> = vec![
             vec![&"public key", &self.config.data.public_key],
             vec![&"network public key", &self.config.data.nw_public_key],
-            vec![&"piublic IP", &pub_ip],
+            vec![&"public IP", &pub_ip],
             vec![&"IP end point", &ip_endpoint],
             vec![&"role", &role],
             vec![&"core version", &self.config.data.core_version],
@@ -357,6 +357,9 @@ impl MonitorWorker {
     /// and sends a his json representation to `addr`
     pub fn run(&mut self, addr: String, file: String) {
         debug!("[monitor] running, monitor data updated every 5 min");
+
+        // retrieve node ip
+        self.config.data.ip_endpoint = Some(get_ip());
 
         // retireve network id
         let request = Message::GetNetworkIdRequest;
