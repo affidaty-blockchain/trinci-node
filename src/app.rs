@@ -318,16 +318,13 @@ impl App {
         #[cfg(feature = "monitor")]
         let monitor_svc = {
             let nw_public_key = p2p_public_key.to_account_id();
-            let public_ip = monitor::worker::get_ip();
 
             let node_status = monitor::worker::Status {
                 public_key: keypair.public_key().to_account_id(), // check if ok
                 nw_public_key,
-                ip_endpoint: None,
                 role: monitor::worker::NodeRole::Ordinary, // FIXME
                 nw_config: monitor::worker::NetworkConfig {
                     name: config.network,
-                    //network_id: todo!(),
                     block_threshold: config.block_threshold,
                     block_timeout: config.block_timeout,
                 },
@@ -339,7 +336,8 @@ impl App {
                     p2p_port: config.p2p_port,
                     p2p_bootstrap_addr: config.p2p_bootstrap_addr,
                 },
-                pub_ip: public_ip,
+                ip_endpoint: config.local_ip,
+                pub_ip: config.public_ip,
                 seed: seed_value,
             };
 

@@ -83,10 +83,10 @@ pub struct Status {
     pub public_key: String,
     /// public key associated with the node for p2p network
     pub nw_public_key: String,
-    /// ip entry point to contact the node
+    /// ip entry point to contact the node (local)
     pub ip_endpoint: Option<String>,
     /// ip seen from the extern
-    pub pub_ip: String,
+    pub pub_ip: Option<String>,
     /// node's role
     pub role: NodeRole,
     /// partial network config that reside in the bootstrap
@@ -217,10 +217,15 @@ impl MonitorWorker {
             None => String::from("None"),
         };
 
+        let pub_ip = match &self.config.data.pub_ip {
+            Some(ip) => ip.clone(),
+            None => String::from("None"),
+        };
+
         let data: Vec<Vec<&dyn Display>> = vec![
             vec![&"public key", &self.config.data.public_key],
             vec![&"network public key", &self.config.data.nw_public_key],
-            vec![&"piublic IP", &self.config.data.pub_ip],
+            vec![&"piublic IP", &pub_ip],
             vec![&"IP end point", &ip_endpoint],
             vec![&"role", &role],
             vec![&"core version", &self.config.data.core_version],
@@ -409,17 +414,4 @@ impl MonitorWorker {
             }
         }
     }
-}
-
-pub(crate) fn get_ip() -> String {
-    let mut dig = Command::new("sh");
-    dig.arg("-c")
-        .arg("dig TXT +short o-o.myaddr.l.google.com @ns1.google.com");
-    let my_public_ip = dig.output().expect("failed to execute process");
-    let my_public_ip = String::from_utf8_lossy(&my_public_ip.stdout);
-    // remove "
-    let mut chars = my_public_ip.trim().chars();
-    chars.next();
-    chars.next_back();
-    chars.as_str().to_string()
 }
