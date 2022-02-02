@@ -219,7 +219,7 @@ struct Bootstrap {
 
 // If this panics, it panics early at node boot. Not a big deal.
 // This should be called only once after the genesis block
-fn load_config_from_service(chan: &BlockRequestSender) -> BlockchainSettings {
+pub(crate) fn load_config_from_service(chan: &BlockRequestSender) -> BlockchainSettings {
     let res_chan = chan
         .send_sync(Message::GetAccountRequest {
             id: SERVICE_ACCOUNT_ID.to_string(),

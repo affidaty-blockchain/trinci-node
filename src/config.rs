@@ -22,7 +22,7 @@
 use std::{fs, path::Path};
 use toml::Value;
 
-/// TODO: add to configuration??? Maybe yes... maybe not.
+/// Default service account.
 pub const SERVICE_ACCOUNT_ID: &str = "TRINCI";
 
 /// Default configuration file.
@@ -35,7 +35,7 @@ pub const DEFAULT_LOG_LEVEL: &str = "info";
 pub const DEFAULT_BOOTSTRAP_PATH: &str = "bootstrap.bin";
 
 /// Default network identifier.
-pub const DEFAULT_NETWORK_ID: &str = "skynet";
+pub const DEFAULT_NETWORK_ID: &str = "bootstrap";
 
 /// Default max transactions per block.
 pub const DEFAULT_BLOCK_THRESHOLD: usize = 42;

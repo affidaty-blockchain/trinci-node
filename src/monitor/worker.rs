@@ -36,6 +36,8 @@ use trinci_core::{
     Block, Message,
 };
 
+use crate::app::load_config_from_service;
+
 /// structure to track node information
 #[derive(Serialize)]
 /// structure that holds the hash of the unconfirmed transaction queue and it's dimension
@@ -143,6 +145,7 @@ impl MonitorWorker {
                 return;
             }
         };
+
         match rx_chan.recv_sync() {
             Ok(Message::GetSeedRespone(seed)) => self.config.data.seed = seed,
             Ok(res) => {
@@ -375,6 +378,11 @@ impl MonitorWorker {
                 warn!("[monitor] blockchain channel closed");
             }
         }
+
+        // load block config
+        let block_config = load_config_from_service(&self.bc_chan);
+        self.config.data.nw_config.block_threshold = block_config.block_threshold;
+        self.config.data.nw_config.block_timeout = block_config.block_timeout;
 
         loop {
             sleep(Duration::new(60 * 5, 0));
