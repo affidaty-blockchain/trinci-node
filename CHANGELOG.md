@@ -26,13 +26,12 @@ Additional labels for pre-release metadata:
 * beta.x: shipped version under testing.
 * rc.x: stable release candidate.
 
-0.2.5 - unreleased
+0.2.5 - 02-02-2022
 ------------------
 
 Added
 * test mode to p2p module (prevent it from start)
+* ip address from commandline
 
 Changed
 * new monitor architecture
-
-

@@ -357,9 +357,6 @@ impl MonitorWorker {
     pub fn run(&mut self, addr: String, file: String) {
         debug!("[monitor] running, monitor data updated every 5 min");
 
-        // retrieve node ip
-        self.config.data.ip_endpoint = Some(get_ip());
-
         // retireve network id
         let request = Message::GetNetworkIdRequest;
         let rx_chan = match self.bc_chan.send_sync(request) {
