@@ -40,11 +40,13 @@ bridge-port = 8001
 
 # P2P bootstrap address
 # Default: empty
-p2p-bootstrap-addr = "12D3KooWEAxyiTiBgx8MUtTPUu29VLasimzscC84jTVRtMb5JjGZ@/ip4/15.161.71.249/tcp/9006"
+# uncomment the follow to sync with trinci testnet
+#p2p-bootstrap-addr = "12D3KooWEAxyiTiBgx8MUtTPUu29VLasimzscC84jTVRtMb5JjGZ@/ip4/15.161.71.249/tcp/9006"
 
 # P2P service address.
 # Default: 127.0.0.1
-p2p-addr = "0.0.0.0"
+# use 0.0.0.0
+p2p-addr = "127.0.0.1"
 
 # P2P service port.
 # Default: 0 (random)
