@@ -27,8 +27,7 @@ use ascii_table::{Align, AsciiTable, Column};
 use isahc::{Request, RequestExt};
 use serde::Serialize;
 use std::{
-    collections::BTreeMap, fmt::Display, fs::File, io::Write, process::Command, thread::sleep,
-    time::Duration,
+    collections::BTreeMap, fmt::Display, fs::File, io::Write, thread::sleep, time::Duration,
 };
 #[cfg(feature = "monitor")]
 use trinci_core::{

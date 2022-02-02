@@ -340,15 +340,17 @@ pub fn create_app_config() -> Config {
         )
         .arg(
             clap::Arg::with_name("local-ip")
-            .short("l")
             .long("local-ip")
-            .help("Populate the local ip info")
+            .help("Populate the local ip info (default None)")
+            .value_name("IP")
+            .required(false),
         )
         .arg(
             clap::Arg::with_name("public-ip")
-            .short("p")
             .long("public-ip")
-            .help("Populate the public ip info")
+            .help("Populate the public ip info (default None)")
+            .value_name("IP")
+            .required(false),
         )
         .get_matches();
 
