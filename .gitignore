@@ -1,4 +1,5 @@
 target
+tools/upnp_negotiator/target
 db*
 Cargo.lock
 blackbox.info
