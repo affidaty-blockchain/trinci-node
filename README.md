@@ -18,8 +18,8 @@ The required dependencies to build correctly the project are the following:
 if present remove `Cargo.lock` file:
 
 ```bash
-cd trinci-node/
-rm Cargo.lock
+$ cd trinci-node/
+$ rm Cargo.lock
 ```
  
 ## Dependencies installation
@@ -29,13 +29,13 @@ rm Cargo.lock
 update the package list:
 
 ```bash
-sudo apt-get update
+$ sudo apt-get update
 ```
 
 install the dependencies:
 
 ```bash
-sudo apt-get install clang libclang-dev
+$ sudo apt-get install clang libclang-dev
 ```
 
 ### Fedora/RHEL
@@ -43,12 +43,12 @@ sudo apt-get install clang libclang-dev
 update the package list:
 
 ```bash
-sudo dnf check-update
+$ sudo dnf check-update
 ```
 
 install the dependencies:
 ```bash
-sudo dnf install clang rust-clang-sys+clang_11_0-devel
+$ sudo dnf install clang rust-clang-sys+clang_11_0-devel
 ```
 
 ## 🔨 Build
@@ -56,15 +56,15 @@ sudo dnf install clang rust-clang-sys+clang_11_0-devel
 to build the **node**:
 
 ```bash
-cd ./trinci-node
-cargo build --release
+$ cd ./trinci-node
+$ cargo build --release
 ```
 
 subsequently build the **tools** needed by the `start.sh` script:
 
 ```bash
-cd tools/upnp_negotiator
-cargo build --release
+$ cd tools/upnp_negotiator
+$ cargo build --release
 ```
 
 # 🏎️ Node Start-Up
@@ -72,14 +72,14 @@ cargo build --release
 to start the node use the `start.sh` script:
 
 ```bash
-./start.sh
+$ ./start.sh
 ```
 
 This script make possible to collect the _local IP_
 , negotiate a _remote access_ point via uPnP, and use this information for the node monitoring. If you not have access to `ip addr`, `ifconfig`, `hostname`, `gid`, collect those infomrations manually and run the node in this way:
 
 ```bash
-./trinci --local-ip $local_ip --public-ip $public_ip:$port --rest-port $TARGET_PORT --bootstrap-path $BS_PATH
+$ ./trinci --local-ip $local_ip --public-ip $public_ip:$port --rest-port $TARGET_PORT --bootstrap-path $BS_PATH
 
 ```
 
@@ -102,7 +102,7 @@ In order to start the node without kad support (eg for local testing) we can use
 >`-t, --test-mode`    Test mode - the kad network is not started
 
 ```
-cargo run -- --test-mode
+$ cargo run -- --test-mode
 ```
 
 # ⚠️ Additional Remarks
@@ -116,9 +116,9 @@ By only running `cargo run`  it launches the node as a follower, this implies th
 The node only accepts **ECDSA** and **Secp256R1** as keypair loaded from file. If your intention is to use a keypair loaded from file follow this instruction to generate one that respects the requirement.
 
 ```bash
-openssl ecparam -name prime256v1 -genkey -outform DER -out prime256v1_pkcs1.der
+$ openssl ecparam -name prime256v1 -genkey -outform DER -out prime256v1_pkcs1.der
 
-openssl pkcs8 -topk8 -nocrypt -inform DER -in prime256v1_pkcs1.der -outform DER -out prime256v1_pkcs8_ecdsa.der
+$ openssl pkcs8 -topk8 -nocrypt -inform DER -in prime256v1_pkcs1.der -outform DER -out prime256v1_pkcs8_ecdsa.der
 ```
 
 ⚠️ The word ecdsa must be in the key filename: es "myKey_foo_ecdsa.der". In other case the binary throw an error.
