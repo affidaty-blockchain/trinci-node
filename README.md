@@ -76,7 +76,7 @@ to start the node use the `start.sh` script:
 ```
 
 This script make possible to collect the _local IP_
-, negotiate an _remote access_ point via uPnP, and use this information for the node monitoring. If you not have access to `ip addr`, `ifconfig`, `hostname`, `gid`, collect those infomrations manually and run the node in this way:
+, negotiate a _remote access_ point via uPnP, and use this information for the node monitoring. If you not have access to `ip addr`, `ifconfig`, `hostname`, `gid`, collect those infomrations manually and run the node in this way:
 
 ```bash
 ./trinci --local-ip $local_ip --public-ip $public_ip:$port --rest-port $TARGET_PORT --bootstrap-path $BS_PATH
@@ -118,8 +118,10 @@ The node only accepts **ECDSA** and **Secp256R1** as keypair loaded from file. I
 ```bash
 openssl ecparam -name prime256v1 -genkey -outform DER -out prime256v1_pkcs1.der
 
-openssl pkcs8 -topk8 -nocrypt -inform DER -in prime256v1_pkcs1.der -outform DER -out prime256v1_pkcs8.der
+openssl pkcs8 -topk8 -nocrypt -inform DER -in prime256v1_pkcs1.der -outform DER -out prime256v1_pkcs8_ecdsa.der
 ```
+
+⚠️ The word ecdsa must be in the key filename: es "myKey_foo_ecdsa.der". In other case the binary throw an error.
 
 ## Trinci Boot Phase
 
