@@ -47,17 +47,28 @@ else
 fi
 
 echo -e "${STEP_CODE}Public IPs: $public_ip ${CLEAN_CODE}"
-
+echo -e "${SUCCESS_CODE}\nHandshaking port for P2P ${CLEAN_CODE}" 
 endpoint_ip=`./tools/upnp_negotiator/target/release/upnp_negotiator $target_ip $TARGET_PORT`
 arrEndpointIp=(${endpoint_ip//:/ })
 
-echo -e "${STEP_CODE}Endpoint IP: $public_ip:${arrEndpointIp[1]} \n ${CLEAN_CODE}"
+if [ -z "${endpoint_ip}" ]; then
+	echo -e "${ERROR_CODE}Handshaking went wrong, running node w/o P2P port ${CLEAN_CODE}" 
+	echo -e "${STEP_CODE}Endpoint IP: $public_ip \n ${CLEAN_CODE}"
+else	
+	echo -e "${STEP_CODE}Endpoint IP: $public_ip:${arrEndpointIp[1]} \n ${CLEAN_CODE}"
+fi
 
 # Launch node.
 if [ ! -f "./target/release/trinci-node" ]; then
     echo -e "${ERROR_CODE}Missing trinci executable. \n${CLEAN_CODE}"
     exit 1
 fi
+	
 echo -e "${SUCCESS_CODE}Starting trinci node... \n ${CLEAN_CODE}"
 
-./target/release/trinci-node --local-ip $local_ip --public-ip $public_ip:${arrEndpointIp[1]} --http-port $HTTP_PORT --p2p-port ${arrEndpointIp[1]} --bootstrap-path $BS_PATH
+# Check if upnp negotiation went wrong
+if [ -z "${endpoint_ip}" ]; then
+	./target/release/trinci-node --local-ip $local_ip --public-ip $public_ip --http-port $HTTP_PORT --bootstrap-path $BS_PATH
+else
+	./target/release/trinci-node --local-ip $local_ip --public-ip $public_ip:${arrEndpointIp[1]} --http-port $HTTP_PORT --p2p-port ${arrEndpointIp[1]} --bootstrap-path $BS_PATH
+fi
