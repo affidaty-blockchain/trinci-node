@@ -4,7 +4,7 @@
 TARGET_PORT=8001
 HTTP_PORT=8000
 BS_PATH='./data/bootstrap.bin'
-BS_ADDR='QmTkVANzjwQeowKByvT45K2DTYtf4vfRkZtGLvGwrHwckF@/ip4/15.160.4.57/tcp/9000'
+BS_ADDR='12D3KooWGPt4ZmE5QZu2Tc62AFv8i7xA7a1TfQXc1zeKMSk3brCT@/ip4/15.161.71.249/tcp/9006'
 
 # Output settings.
 STEP_CODE="\033[0;33m"
