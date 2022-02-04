@@ -4,6 +4,7 @@
 TARGET_PORT=8001
 HTTP_PORT=8000
 BS_PATH='./data/bootstrap.bin'
+BS_ADDR='QmTkVANzjwQeowKByvT45K2DTYtf4vfRkZtGLvGwrHwckF@/ip4/15.160.4.57/tcp/9000'
 
 # Output settings.
 STEP_CODE="\033[0;33m"
@@ -19,13 +20,13 @@ echo -e "${SUCCESS_CODE}Gatering network informations... \n${CLEAN_CODE}"
 if command -v ip &> /dev/null
 then
     local_ip=`ip addr | sed -n -e '/state UP/,/[0-9]: / p' | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1' | tr '\n' '|'`
-    local_ip=${local_ip::-1}
+    local_ip=${local_ip%?}
 fi
 
 if command -v ifconfig &> /dev/null
 then
     local_ip=`ifconfig | sed -n -e '/UP/,/[0-9]: / p' | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1' | tr '\n' '|'`
-    local_ip=${local_ip::-1}
+    local_ip=${local_ip%?}
 fi
 
 if [ $? -ne 0 ]; then
@@ -66,9 +67,13 @@ fi
 	
 echo -e "${SUCCESS_CODE}Starting trinci node... \n ${CLEAN_CODE}"
 
-# Check if upnp negotiation went wrong
 if [ -z "${endpoint_ip}" ]; then
-	./target/release/trinci-node --local-ip $local_ip --public-ip $public_ip --http-port $HTTP_PORT --bootstrap-path $BS_PATH
+	# If uPnP went wrong.
+	./target/release/trinci-node --local-ip $local_ip --public-ip $public_ip --http-port $HTTP_PORT --bootstrap-path $BS_PATH --p2p-bootstrap-addr $BS_ADDR 
+elif [ -z "${public_ip}" ]; then
+	# If no public IP.
+	./target/release/trinci-node --local-ip $local_ip --http-port $HTTP_PORT --p2p-port ${arrEndpointIp[1]} --bootstrap-path $BS_PATH --p2p-bootstrap-addr $BS_ADDR 
 else
-	./target/release/trinci-node --local-ip $local_ip --public-ip $public_ip:${arrEndpointIp[1]} --http-port $HTTP_PORT --p2p-port ${arrEndpointIp[1]} --bootstrap-path $BS_PATH
+	# If all went good
+	./target/release/trinci-node --local-ip $local_ip --public-ip $public_ip:${arrEndpointIp[1]} --http-port $HTTP_PORT --p2p-port ${arrEndpointIp[1]} --bootstrap-path $BS_PATH --p2p-bootstrap-addr $BS_ADDR 
 fi
