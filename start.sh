@@ -1,7 +1,11 @@
 #!/bin/bash
-TARGET_PORT=8000
+
+# Node vars.
+TARGET_PORT=8001
+HTTP_PORT=8000
 BS_PATH='./data/bootstrap.bin'
 
+# Output settings.
 STEP_CODE="\033[0;33m"
 CLEAN_CODE="\033[0m"
 SUCCESS_CODE="\033[0;32m"
@@ -11,7 +15,7 @@ echo -e "\nTrinci node start script v0.0.1 \n"
 
 echo -e "${SUCCESS_CODE}Gatering network informations... \n${CLEAN_CODE}"
 # Recover local ip.
-# Check which command use
+# Check which command use.
 if command -v ip &> /dev/null
 then
     local_ip=`ip addr | sed -n -e '/state UP/,/[0-9]: / p' | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1' | tr '\n' '|'`
@@ -33,7 +37,14 @@ echo -e "${STEP_CODE}Local IPs: $local_ip ${CLEAN_CODE}"
 
 # uPnP operation to deal externa ip.
 target_ip=`hostname -I | awk '{print $1}'`
-public_ip=`dig +short myip.opendns.com @resolver1.opendns.com`
+
+if command -v dig &> /dev/null
+then
+    public_ip=`dig +short myip.opendns.com @resolver1.opendns.com`
+else
+    echo -e "${ERROR_CODE}Dig command is missing, please install dnsutils to continue. \n${CLEAN_CODE}"
+    exit 1
+fi
 
 echo -e "${STEP_CODE}Public IPs: $public_ip ${CLEAN_CODE}"
 
@@ -49,4 +60,4 @@ if [ ! -f "./target/release/trinci-node" ]; then
 fi
 echo -e "${SUCCESS_CODE}Starting trinci node... \n ${CLEAN_CODE}"
 
-./target/release/trinci-node --local-ip $local_ip --public-ip $public_ip:${arrEndpointIp[1]} --http-port $TARGET_PORT --bootstrap-path $BS_PATH
+./target/release/trinci-node --local-ip $local_ip --public-ip $public_ip:${arrEndpointIp[1]} --http-port $HTTP_PORT --p2p-port ${arrEndpointIp[1]} --bootstrap-path $BS_PATH
