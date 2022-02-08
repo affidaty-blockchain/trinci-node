@@ -42,7 +42,7 @@ bridge-port = 8001
 # P2P service address.
 # Default: 127.0.0.1
 # use 0.0.0.0
-p2p-addr = "127.0.0.1"
+p2p-addr = "0.0.0.0"
 
 # P2P service port.
 # Default: 0 (random)
