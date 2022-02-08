@@ -23,6 +23,8 @@ use std::sync::Arc;
 use trinci_core::base::BlockchainSettings;
 use trinci_core::crypto::drand::SeedSource;
 use trinci_core::crypto::{Hash, HashAlgorithm};
+use trinci_core::db::DbFork;
+use trinci_core::Account;
 
 use trinci_core::{
     base::{
@@ -35,8 +37,8 @@ use trinci_core::{
     db::{Db, RocksDb, RocksDbFork},
     p2p::{service::PeerConfig, PeerService},
     rest::{RestConfig, RestService},
-    wm::{WasmLoader, Wm, WmLocal},
-    Error, ErrorKind, Transaction,
+    wm::{Wm, WmLocal},
+    ErrorKind, Transaction,
 };
 /// Application context.
 pub struct App {
@@ -114,45 +116,7 @@ fn is_validator_function_call(
     }
 }
 
-/// Smart contracts loader that is used during the bootstrap phase.
-/// This loader unconditionally loads the "bootstrap" contract and ignores the
-/// requested contract hash.
-fn bootstrap_loader(bootstrap_bin: Vec<u8>) -> impl WasmLoader {
-    move |_hash| Ok(bootstrap_bin.to_owned())
-}
-
-// Smart contracts loader that loads the binaries that were registered in the
-// "service" account.
-fn blockchain_loader(chan: BlockRequestSender) -> impl WasmLoader {
-    move |hash| {
-        // This is the path followed during normal operational stage.
-
-        let mut code_key = String::from("contracts:code:");
-        code_key.push_str(&hex::encode(hash));
-
-        let req = Message::GetAccountRequest {
-            id: SERVICE_ACCOUNT_ID.to_string(),
-            data: vec![code_key],
-        };
-        let res_chan = chan.send_sync(req).unwrap();
-        match res_chan.recv_sync() {
-            Ok(Message::GetAccountResponse { acc: _, mut data }) => {
-                if data.is_empty() || data[0].is_none() {
-                    Err(Error::new_ext(
-                        ErrorKind::ResourceNotFound,
-                        "smart contract not found",
-                    ))
-                } else {
-                    Ok(data[0].take().unwrap())
-                }
-            }
-            Ok(Message::Exception(err)) => Err(err),
-            _ => Err(Error::new(ErrorKind::Other)),
-        }
-    }
-}
-
-fn bootstrap_monitor(chan: BlockRequestSender, wm: Arc<Mutex<WmLocal>>) {
+fn bootstrap_monitor(chan: BlockRequestSender) {
     debug!("Bootstrap procedure started");
 
     let res_chan = chan
@@ -169,8 +133,6 @@ fn bootstrap_monitor(chan: BlockRequestSender, wm: Arc<Mutex<WmLocal>>) {
                     debug!(
                         "Bootstrap is over, switching to a better loader and validator check..."
                     );
-                    let loader = blockchain_loader(chan.clone());
-                    wm.lock().set_loader(loader);
 
                     break;
                 } else {
@@ -247,8 +209,7 @@ pub(crate) fn load_config_from_service(chan: &BlockRequestSender) -> BlockchainS
 impl App {
     /// Create a new Application instance.
     pub fn new(config: Config, keypair: KeyPair) -> Self {
-        let temporary_bootstrap_loader = bootstrap_loader(vec![]);
-        let wm = WmLocal::new(temporary_bootstrap_loader, config.wm_cache_max);
+        let wm = WmLocal::new(config.wm_cache_max);
         let db = RocksDb::new(&config.db_path);
 
         let keypair = Arc::new(keypair);
@@ -406,6 +367,21 @@ impl App {
         self.block_svc.lock().start();
     }
 
+    // Store manually the service Account on the DB
+    fn store_service_account(
+        &self,
+        db: Arc<RwLock<dyn Db<DbForkType = RocksDbFork>>>,
+        bootstrap_bin: Vec<u8>,
+    ) {
+        let mut fork = db.write().fork_create();
+        let hash = Hash::from_data(HashAlgorithm::Sha256, &bootstrap_bin);
+        fork.store_account(Account::new(SERVICE_ACCOUNT_ID, Some(hash)));
+        let mut key = String::from("contracts:code:");
+        key.push_str(&hex::encode(&hash));
+        fork.store_account_data(SERVICE_ACCOUNT_ID, &key, bootstrap_bin);
+        db.write().fork_merge(fork).unwrap();
+    }
+
     /// Starts the blockchain service to receive messages from the bootstrap procedure.
     /// Spawn a temporary thread that takes care of "service" account creation.
     /// Once that the service account is created, the thread takes care to set the
@@ -415,15 +391,13 @@ impl App {
 
         self.block_svc.lock().start();
 
+        let db = self.block_svc.lock().db_arc();
+
         let chan = self.block_svc.lock().request_channel();
         if is_service_present(&chan) {
             let network_name = self.set_config_from_db();
 
-            let loader = blockchain_loader(chan);
-            self.block_svc.lock().wm_arc().lock().set_loader(loader);
-
             let wm = self.block_svc.lock().wm_arc();
-            let db = self.block_svc.lock().db_arc();
 
             let is_validator = is_validator_function_call(wm, db);
 
@@ -436,14 +410,8 @@ impl App {
             let (good_network_name, bootstrap_bin, bootstrap_txs) =
                 load_bootstrap_struct_from_file(&self.bootstrap_path);
 
-            let wm = self.block_svc.lock().wm_arc();
-
-            let bootstrap_loader = bootstrap_loader(bootstrap_bin);
-            self.block_svc
-                .lock()
-                .wm_arc()
-                .lock()
-                .set_loader(bootstrap_loader);
+            // Store the service account on the DB
+            self.store_service_account(db, bootstrap_bin);
 
             let block_threshold = if bootstrap_txs.is_empty() {
                 42
@@ -466,7 +434,7 @@ impl App {
                 let db = self.block_svc.lock().db_arc();
 
                 std::thread::spawn(move || {
-                    bootstrap_monitor(chan.clone(), wm.clone());
+                    bootstrap_monitor(chan.clone());
 
                     let mut bs = block_svc.lock();
                     let mut config = load_config_from_service(&chan.clone());
@@ -497,7 +465,7 @@ impl App {
             } else {
                 self.put_txs_in_the_pool(bootstrap_txs);
 
-                bootstrap_monitor(chan.clone(), wm); // Blocking function
+                bootstrap_monitor(chan.clone()); // Blocking function
 
                 let mut config = load_config_from_service(&chan);
 
