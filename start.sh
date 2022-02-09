@@ -4,7 +4,8 @@
 TARGET_PORT=8001
 HTTP_PORT=8000
 BS_PATH='./data/bootstrap.bin'
-BS_ADDR='12D3KooWGPt4ZmE5QZu2Tc62AFv8i7xA7a1TfQXc1zeKMSk3brCT@/ip4/15.161.71.249/tcp/9006'
+BS_IP_ADDR = '15.161.71.249' 
+BS_ADDR='@/ip4/15.161.71.249/tcp/9006'
 
 # Output settings.
 STEP_CODE="\033[0;33m"
@@ -59,21 +60,28 @@ else
 	echo -e "${STEP_CODE}Endpoint IP: $public_ip:${arrEndpointIp[1]} \n ${CLEAN_CODE}"
 fi
 
+# Retrieve BS addr ID
+echo -e "${SUCCESS_CODE}Retrieving P2P bootstrap ID... \n ${CLEAN_CODE}"
+bs_id=`curl http://testnet.trinci.net/api/v1/p2p/id` 
+bs_addr="${bs_id}${BS_ADDR}"
+echo -e "${STEP_CODE}Bootstrap address: $bs_addr\n ${CLEAN_CODE}"
+
+
 # Launch node.
 if [ ! -f "./target/release/trinci-node" ]; then
     echo -e "${ERROR_CODE}Missing trinci executable. \n${CLEAN_CODE}"
     exit 1
 fi
-	
+
 echo -e "${SUCCESS_CODE}Starting trinci node... \n ${CLEAN_CODE}"
 
 if [ -z "${endpoint_ip}" ]; then
 	# If uPnP went wrong.
-	./target/release/trinci-node --local-ip $local_ip --public-ip $public_ip --http-port $HTTP_PORT --bootstrap-path $BS_PATH --p2p-bootstrap-addr $BS_ADDR 
+	./target/release/trinci-node --local-ip $local_ip --public-ip $public_ip --http-port $HTTP_PORT --bootstrap-path $BS_PATH --p2p-bootstrap-addr $bs_addr 
 elif [ -z "${public_ip}" ]; then
 	# If no public IP.
-	./target/release/trinci-node --local-ip $local_ip --http-port $HTTP_PORT --p2p-port ${arrEndpointIp[1]} --bootstrap-path $BS_PATH --p2p-bootstrap-addr $BS_ADDR 
+	./target/release/trinci-node --local-ip $local_ip --http-port $HTTP_PORT --p2p-port ${arrEndpointIp[1]} --bootstrap-path $BS_PATH --p2p-bootstrap-addr $bs_addr 
 else
 	# If all went good
-	./target/release/trinci-node --local-ip $local_ip --public-ip $public_ip:${arrEndpointIp[1]} --http-port $HTTP_PORT --p2p-port ${arrEndpointIp[1]} --bootstrap-path $BS_PATH --p2p-bootstrap-addr $BS_ADDR 
+	./target/release/trinci-node --local-ip $local_ip --public-ip $public_ip:${arrEndpointIp[1]} --http-port $HTTP_PORT --p2p-port ${arrEndpointIp[1]} --bootstrap-path $BS_PATH --p2p-bootstrap-addr $bs_addr 
 fi
