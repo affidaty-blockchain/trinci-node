@@ -57,6 +57,6 @@ db-path = "db"
 # Default: 10 (totally arbitrary value)
 wm-cache-max = 10
 
-# Test mode - prevent kad from start
+# Offline mode- prevent kad from start
 # Default: false
-#test-mode = true
+#offline = true

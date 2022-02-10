@@ -131,12 +131,13 @@ fn bootstrap_monitor(chan: BlockRequestSender) {
             Ok(Message::GetBlockResponse { .. }) => {
                 if is_service_present(&chan) {
                     debug!(
-                        "Bootstrap is over, switching to a better loader and validator check..."
+                        "Bootstrap is over, switching to a better validator check..."
                     );
 
                     break;
                 } else {
-                    warn!("Block constructed but 'service' account is not yet active");
+                    error!("Block constructed but 'service' account is not yet active");
+                    panic!();
                 }
             }
             Ok(res) => warn!("Bootstrap unexpected message: {:?}", res),
@@ -165,7 +166,7 @@ fn load_bootstrap_struct_from_file(path: &str) -> (String, Vec<u8>, Vec<Transact
 
     match rmp_deserialize::<Bootstrap>(&buf) {
         Ok(bs) => (calculate_network_name(&buf), bs.bin, bs.txs),
-        Err(_) => (calculate_network_name(&buf), buf, vec![]),
+        Err(_) => panic!("Invalid bootstrap file format!"), // If the bootstrap is not valid should panic!
     }
 }
 #[derive(Serialize, Deserialize)]
@@ -265,7 +266,7 @@ impl App {
             network: Mutex::new(config.network.clone()),
             bootstrap_addr: config.p2p_bootstrap_addr.clone(),
             p2p_keypair: Some(p2p_keypair),
-            active: !config.test_mode,
+            active: !config.offline,
         };
         let p2p_svc = PeerService::new(p2p_config, chan.clone());
 
@@ -410,6 +411,7 @@ impl App {
             self.p2p_svc.lock().set_network_name(network_name);
             p2p_start = true;
         } else {
+
             // Load the Bootstrap Struct from file
             let (good_network_name, bootstrap_bin, bootstrap_txs) =
                 load_bootstrap_struct_from_file(&self.bootstrap_path);
@@ -437,6 +439,7 @@ impl App {
             let p2p_svc = self.p2p_svc.clone();
 
             if bootstrap_txs.is_empty() {
+
                 let wm = self.block_svc.lock().wm_arc();
                 let db = self.block_svc.lock().db_arc();
 
@@ -473,6 +476,7 @@ impl App {
                 });
                 p2p_start = false;
             } else {
+
                 self.put_txs_in_the_pool(bootstrap_txs);
 
                 bootstrap_monitor(chan.clone()); // Blocking function
