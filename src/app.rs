@@ -15,11 +15,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with TRINCI. If not, see <https://www.gnu.org/licenses/>.
 
+#[cfg(feature = "monitor")]
+use crate::monitor::{self, service::MonitorService, worker::MonitorConfig};
 use crate::{config::Config, config::SERVICE_ACCOUNT_ID};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use trinci_core::base::BlockchainSettings;
+use trinci_core::crypto::drand::SeedSource;
 use trinci_core::crypto::{Hash, HashAlgorithm};
+use trinci_core::db::DbFork;
+use trinci_core::Account;
 
 use trinci_core::{
     base::{
@@ -32,8 +37,8 @@ use trinci_core::{
     db::{Db, RocksDb, RocksDbFork},
     p2p::{service::PeerConfig, PeerService},
     rest::{RestConfig, RestService},
-    wm::{WasmLoader, Wm, WmLocal},
-    Error, ErrorKind, Transaction,
+    wm::{Wm, WmLocal},
+    ErrorKind, Transaction,
 };
 /// Application context.
 pub struct App {
@@ -45,6 +50,9 @@ pub struct App {
     pub p2p_svc: Arc<Mutex<PeerService>>,
     /// Bridge service context.
     pub bridge_svc: BridgeService,
+    /// Monitor service context.
+    #[cfg(feature = "monitor")]
+    pub monitor_svc: Option<MonitorService>,
     /// Keypair placeholder.
     pub keypair: Arc<KeyPair>,
     /// p2p Keypair placeholder
@@ -108,45 +116,7 @@ fn is_validator_function_call(
     }
 }
 
-/// Smart contracts loader that is used during the bootstrap phase.
-/// This loader unconditionally loads the "bootstrap" contract and ignores the
-/// requested contract hash.
-fn bootstrap_loader(bootstrap_bin: Vec<u8>) -> impl WasmLoader {
-    move |_hash| Ok(bootstrap_bin.to_owned())
-}
-
-// Smart contracts loader that loads the binaries that were registered in the
-// "service" account.
-fn blockchain_loader(chan: BlockRequestSender) -> impl WasmLoader {
-    move |hash| {
-        // This is the path followed during normal operational stage.
-
-        let mut code_key = String::from("contracts:code:");
-        code_key.push_str(&hex::encode(hash));
-
-        let req = Message::GetAccountRequest {
-            id: SERVICE_ACCOUNT_ID.to_string(),
-            data: vec![code_key],
-        };
-        let res_chan = chan.send_sync(req).unwrap();
-        match res_chan.recv_sync() {
-            Ok(Message::GetAccountResponse { acc: _, mut data }) => {
-                if data.is_empty() || data[0].is_none() {
-                    Err(Error::new_ext(
-                        ErrorKind::ResourceNotFound,
-                        "smart contract not found",
-                    ))
-                } else {
-                    Ok(data[0].take().unwrap())
-                }
-            }
-            Ok(Message::Exception(err)) => Err(err),
-            _ => Err(Error::new(ErrorKind::Other)),
-        }
-    }
-}
-
-fn bootstrap_monitor(chan: BlockRequestSender, wm: Arc<Mutex<WmLocal>>) {
+fn bootstrap_monitor(chan: BlockRequestSender) {
     debug!("Bootstrap procedure started");
 
     let res_chan = chan
@@ -163,8 +133,6 @@ fn bootstrap_monitor(chan: BlockRequestSender, wm: Arc<Mutex<WmLocal>>) {
                     debug!(
                         "Bootstrap is over, switching to a better loader and validator check..."
                     );
-                    let loader = blockchain_loader(chan.clone());
-                    wm.lock().set_loader(loader);
 
                     break;
                 } else {
@@ -188,7 +156,7 @@ fn calculate_network_name(data: &[u8]) -> String {
     bs58::encode(hash).into_string()
 }
 
-// Load the boostrap struct from file, panic if something goes wrong
+// Load the bootstrap struct from file, panic if something goes wrong
 fn load_bootstrap_struct_from_file(path: &str) -> (String, Vec<u8>, Vec<Transaction>) {
     let mut bootstrap_file = std::fs::File::open(path).expect("bootstrap file not found");
 
@@ -203,14 +171,17 @@ fn load_bootstrap_struct_from_file(path: &str) -> (String, Vec<u8>, Vec<Transact
 #[derive(Serialize, Deserialize)]
 struct Bootstrap {
     // Binary bootstrap.wasm
+    #[serde(with = "serde_bytes")]
     bin: Vec<u8>,
     // Vec of transaction for the genesis block
     txs: Vec<Transaction>,
+    // Random string to generate unique file
+    nonce: String,
 }
 
 // If this panics, it panics early at node boot. Not a big deal.
 // This should be called only once after the genesis block
-fn load_config_from_service(chan: &BlockRequestSender) -> BlockchainSettings {
+pub(crate) fn load_config_from_service(chan: &BlockRequestSender) -> BlockchainSettings {
     let res_chan = chan
         .send_sync(Message::GetAccountRequest {
             id: SERVICE_ACCOUNT_ID.to_string(),
@@ -238,8 +209,7 @@ fn load_config_from_service(chan: &BlockRequestSender) -> BlockchainSettings {
 impl App {
     /// Create a new Application instance.
     pub fn new(config: Config, keypair: KeyPair) -> Self {
-        let temporary_bootstrap_loader = bootstrap_loader(vec![]);
-        let wm = WmLocal::new(temporary_bootstrap_loader, config.wm_cache_max);
+        let wm = WmLocal::new(config.wm_cache_max);
         let db = RocksDb::new(&config.db_path);
 
         let keypair = Arc::new(keypair);
@@ -253,12 +223,30 @@ impl App {
 
         let is_validator = is_validator_function_temporary(true);
 
+        // seed initialization
+        let nonce: Vec<u8> = vec![0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
+
+        let prev_hash =
+            Hash::from_hex("1220d4ff2e94b9ba93c2bd4f5e383eeb5c5022fd4a223285629cfe2c86ed4886f730")
+                .unwrap();
+        let txs_hash =
+            Hash::from_hex("1220d4ff2e94b9ba93c2bd4f5e383eeb5c5022fd4a223285629cfe2c86ed4886f730")
+                .unwrap();
+        let rxs_hash =
+            Hash::from_hex("1220d4ff2e94b9ba93c2bd4f5e383eeb5c5022fd4a223285629cfe2c86ed4886f730")
+                .unwrap();
+        let seed = SeedSource::new(config.network.clone(), nonce, prev_hash, txs_hash, rxs_hash);
+        let seed = Arc::new(seed);
+        #[cfg(feature = "monitor")]
+        let seed_value = seed.get_seed();
+
         let block_svc = BlockService::new(
             &keypair.public_key().to_account_id(),
             is_validator,
             block_config,
             db,
             wm,
+            seed,
         );
         let chan = block_svc.request_channel();
 
@@ -277,6 +265,7 @@ impl App {
             network: Mutex::new(config.network.clone()),
             bootstrap_addr: config.p2p_bootstrap_addr.clone(),
             p2p_keypair: Some(p2p_keypair),
+            active: !config.test_mode,
         };
         let p2p_svc = PeerService::new(p2p_config, chan.clone());
 
@@ -284,7 +273,42 @@ impl App {
             addr: config.bridge_addr,
             port: config.bridge_port,
         };
-        let bridge_svc = BridgeService::new(bridge_config, chan);
+        let bridge_svc = BridgeService::new(bridge_config, chan.clone());
+
+        // block chain monitor
+        #[cfg(feature = "monitor")]
+        let monitor_svc = {
+            let nw_public_key = p2p_public_key.to_account_id();
+
+            let node_status = monitor::worker::Status {
+                public_key: keypair.public_key().to_account_id(), // check if ok
+                nw_public_key,
+                role: monitor::worker::NodeRole::Ordinary, // FIXME
+                nw_config: monitor::worker::NetworkConfig {
+                    name: config.network,
+                    block_threshold: config.block_threshold,
+                    block_timeout: config.block_timeout,
+                },
+                core_version: trinci_core::VERSION.to_string(),
+                last_block: None,
+                unconfirmed_pool: None,
+                p2p_info: monitor::worker::P2pInfo {
+                    p2p_addr: config.p2p_addr,
+                    p2p_port: config.p2p_port,
+                    p2p_bootstrap_addr: config.p2p_bootstrap_addr,
+                },
+                ip_endpoint: config.local_ip,
+                pub_ip: config.public_ip,
+                seed: seed_value,
+            };
+
+            let monitor_config = MonitorConfig {
+                nodeID: keypair.public_key().to_account_id(),
+                data: node_status,
+            };
+
+            MonitorService::new(monitor_config, chan)
+        };
 
         App {
             block_svc: Arc::new(Mutex::new(block_svc)),
@@ -294,6 +318,8 @@ impl App {
             p2p_public_key,
             bootstrap_path: config.bootstrap_path,
             keypair,
+            #[cfg(feature = "monitor")]
+            monitor_svc: Some(monitor_svc),
         }
     }
 
@@ -345,24 +371,37 @@ impl App {
         self.block_svc.lock().start();
     }
 
+    // Store manually the service Account on the DB
+    fn store_service_account(
+        &self,
+        db: Arc<RwLock<dyn Db<DbForkType = RocksDbFork>>>,
+        bootstrap_bin: Vec<u8>,
+    ) {
+        let mut fork = db.write().fork_create();
+        let hash = Hash::from_data(HashAlgorithm::Sha256, &bootstrap_bin);
+        fork.store_account(Account::new(SERVICE_ACCOUNT_ID, Some(hash)));
+        let mut key = String::from("contracts:code:");
+        key.push_str(&hex::encode(&hash));
+        fork.store_account_data(SERVICE_ACCOUNT_ID, &key, bootstrap_bin);
+        db.write().fork_merge(fork).unwrap();
+    }
+
     /// Starts the blockchain service to receive messages from the bootstrap procedure.
     /// Spawn a temporary thread that takes care of "service" account creation.
     /// Once that the service account is created, the thread takes care to set the
     /// main smart contracts loader within the wasm machine.
-    pub fn start(&mut self) {
+    pub fn start(&mut self, _file: Option<String>, _addr: Option<String>) {
         let p2p_start;
 
         self.block_svc.lock().start();
+
+        let db = self.block_svc.lock().db_arc();
 
         let chan = self.block_svc.lock().request_channel();
         if is_service_present(&chan) {
             let network_name = self.set_config_from_db();
 
-            let loader = blockchain_loader(chan);
-            self.block_svc.lock().wm_arc().lock().set_loader(loader);
-
             let wm = self.block_svc.lock().wm_arc();
-            let db = self.block_svc.lock().db_arc();
 
             let is_validator = is_validator_function_call(wm, db);
 
@@ -371,18 +410,12 @@ impl App {
             self.p2p_svc.lock().set_network_name(network_name);
             p2p_start = true;
         } else {
-            // Load the Boostrap Struct from file
+            // Load the Bootstrap Struct from file
             let (good_network_name, bootstrap_bin, bootstrap_txs) =
                 load_bootstrap_struct_from_file(&self.bootstrap_path);
 
-            let wm = self.block_svc.lock().wm_arc();
-
-            let bootstrap_loader = bootstrap_loader(bootstrap_bin);
-            self.block_svc
-                .lock()
-                .wm_arc()
-                .lock()
-                .set_loader(bootstrap_loader);
+            // Store the service account on the DB
+            self.store_service_account(db, bootstrap_bin);
 
             let block_threshold = if bootstrap_txs.is_empty() {
                 42
@@ -396,6 +429,8 @@ impl App {
                 block_timeout: 2,
                 burning_fuel_method: String::new(),
                 network_name: Some("bootstrap".to_string()), // The genesis block will be executed after this timeout and not with block_threshold transactions in the pool // FIXME
+                is_production: false,
+                min_node_version: String::from("0.2.6"),
             });
 
             let block_svc = self.block_svc.clone();
@@ -406,7 +441,7 @@ impl App {
                 let db = self.block_svc.lock().db_arc();
 
                 std::thread::spawn(move || {
-                    bootstrap_monitor(chan.clone(), wm.clone());
+                    bootstrap_monitor(chan.clone());
 
                     let mut bs = block_svc.lock();
                     let mut config = load_config_from_service(&chan.clone());
@@ -440,7 +475,7 @@ impl App {
             } else {
                 self.put_txs_in_the_pool(bootstrap_txs);
 
-                bootstrap_monitor(chan.clone(), wm); // Blocking function
+                bootstrap_monitor(chan.clone()); // Blocking function
 
                 let mut config = load_config_from_service(&chan);
 
@@ -470,6 +505,13 @@ impl App {
             self.p2p_svc.lock().start();
         }
         self.bridge_svc.start();
+
+        #[cfg(feature = "monitor")]
+        {
+            let addr: String = _addr.unwrap();
+            let file: String = _file.unwrap();
+            self.monitor_svc.as_mut().unwrap().start(addr, file);
+        }
     }
 
     pub fn park(&mut self) {
@@ -492,11 +534,20 @@ impl App {
                 error!("Bridge service is not running");
                 stop = true;
             }
+            #[cfg(feature = "monitor")]
+            {
+                if !self.monitor_svc.as_mut().unwrap().is_running() {
+                    error!("Monitor service is not running");
+                    stop = true;
+                }
+            }
             if stop {
                 self.block_svc.lock().stop();
                 self.rest_svc.stop();
                 self.p2p_svc.lock().stop();
                 self.bridge_svc.stop();
+                #[cfg(feature = "monitor")]
+                self.monitor_svc.as_mut().unwrap().stop();
                 break;
             }
         }
@@ -507,10 +558,10 @@ impl App {
 #[cfg(test)]
 mod tests {
     use crate::app::Bootstrap;
-    use glob::glob;
+    use trinci_core::base::serialize::rmp_deserialize;
     use trinci_core::crypto::ed25519::KeyPair as Ed25519KeyPair;
-    use trinci_core::{base::serialize::rmp_deserialize, Message};
 
+    #[ignore = "use this to check a boostrap file"]
     #[test]
     fn read_bootstrap_bin() {
         let mut bootstrap_file = std::fs::File::open("./bootstrap.bin").unwrap();
@@ -520,55 +571,9 @@ mod tests {
         let bootstrap = rmp_deserialize::<Bootstrap>(&buf);
 
         assert!(bootstrap.is_ok());
-
-        println!("{} Transactions", bootstrap.unwrap().txs.len());
-    }
-
-    #[test]
-    #[ignore = "this is a temporary way to create bootstrap.bin"]
-    fn create_bootstrap_bin() {
-        let mut bootstrap_file = std::fs::File::open("./service.wasm").unwrap();
-        let mut bootstrap = Vec::new();
-        std::io::Read::read_to_end(&mut bootstrap_file, &mut bootstrap).expect("loading bootstrap");
-
-        let mut txs = Vec::new();
-
-        for entry in glob("./txs/*.bin").expect("Failed to read glob pattern") {
-            match entry {
-                Ok(path) => {
-                    let filename = path.clone();
-                    let filename = filename.file_name().unwrap().to_str().unwrap();
-
-                    if !filename.starts_with("_") {
-                        let mut tx_file = std::fs::File::open(path).unwrap();
-
-                        let mut tx_bin = Vec::new();
-                        std::io::Read::read_to_end(&mut tx_file, &mut tx_bin)
-                            .expect(&format!("Error reading: {:?}", filename));
-
-                        let msg: Message = rmp_deserialize(&tx_bin).unwrap();
-
-                        let tx = match msg {
-                            Message::PutTransactionRequest { confirm: _, tx } => tx,
-                            _ => panic!("Expected put transaction request message"),
-                        };
-
-                        txs.push(tx);
-                        println!("Added tx: {}", filename);
-                    }
-                }
-                Err(e) => println!("{:?}", e),
-            }
-        }
-
-        let bootstrap_bin = Bootstrap {
-            bin: bootstrap,
-            txs,
-        };
-
-        let bootstrap_buf = trinci_core::base::serialize::rmp_serialize(&bootstrap_bin).unwrap();
-
-        std::fs::write("bootstrap.bin", bootstrap_buf).unwrap();
+        let bootstrap = bootstrap.unwrap();
+        println!("{} Transactions", &bootstrap.txs.len());
+        println!("nonce: `{}`", &bootstrap.nonce);
     }
 
     #[ignore = "use this to create a new ed25519 keypair"]

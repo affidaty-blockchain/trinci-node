@@ -1,6 +1,6 @@
 [package]
 name = "trinci-node"
-version = "0.2.4-rc1"
+version = "0.2.7-rc1"
 authors = ["The Trinci Team <trinci@affidaty.io>"]
 edition = "2021"
 description = "TRINCI blockchain node"
@@ -9,23 +9,25 @@ keywords = ["trinci", "blockchain", "node"]
 [dependencies]
 #RESTORE BEFORE MERGE IN MASTER trinci-core = { git = "https://github.com/affidaty-blockchain/trinci-core" }
 trinci-core = { path = "../trinci-core" }
+
 log = { version = "0.4.14", features = ["release_max_level_info"] }
-clap = "2.33.3"
+clap = "2.34.0"
 toml = "0.5.8"
 simplelog = "0.11.1"
 hex = "0.4.3"
 serde-value = { git = "https://github.com/affidaty-blockchain/serde-value", branch = "helper_macro" }
+serde_bytes = "0.11.5"
 # base58 for network name calculation
 bs58 = "0.4.0"
 rand = "0.8.4"
 tempfile = "3.2.0"
 # Serialization 
-serde = { version = "1.0.126", features = ["derive"], optional = true }
+serde = { version = "1.0.126", features = ["derive"] }
 serde_json = { version = "1.0", optional = true }
 # POST
 isahc = { version = "1.6.0", optional = true }
 # pretty print on file
-ascii_table = { version = "3.0.2", optional = true }
+ascii_table = { version = "4.0.2", optional = true }
 
 [dev-dependencies]
 glob = "0.3.0"
@@ -33,4 +35,4 @@ glob = "0.3.0"
 [features]
 default = ["monitor"]
 tpm2 = ["trinci-core/tpm2"]
-monitor = ["serde", "serde_json", "isahc", "ascii_table"]
+monitor = ["serde_json", "isahc", "ascii_table"]

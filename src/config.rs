@@ -22,7 +22,7 @@
 use std::{fs, path::Path};
 use toml::Value;
 
-/// TODO: add to configuration??? Maybe yes... maybe not.
+/// Default service account.
 pub const SERVICE_ACCOUNT_ID: &str = "TRINCI";
 
 /// Default configuration file.
@@ -35,7 +35,7 @@ pub const DEFAULT_LOG_LEVEL: &str = "info";
 pub const DEFAULT_BOOTSTRAP_PATH: &str = "bootstrap.bin";
 
 /// Default network identifier.
-pub const DEFAULT_NETWORK_ID: &str = "skynet";
+pub const DEFAULT_NETWORK_ID: &str = "bootstrap";
 
 /// Default max transactions per block.
 pub const DEFAULT_BLOCK_THRESHOLD: usize = 42;
@@ -108,10 +108,16 @@ pub struct Config {
     pub bootstrap_path: String,
     /// WASM machine max cache size.
     pub wm_cache_max: usize,
-    /// monitor file
+    /// Monitor file.
     pub monitor_file: String,
-    /// monitor addr
+    /// Monitor addr.
     pub monitor_addr: String,
+    /// Test mode.
+    pub test_mode: bool,
+    /// Local IP.
+    pub local_ip: Option<String>,
+    /// IP seen from the extern.
+    pub public_ip: Option<String>,
 }
 
 impl Default for Config {
@@ -134,6 +140,9 @@ impl Default for Config {
             wm_cache_max: DEFAULT_WM_CACHE_MAX,
             monitor_file: DEFAULT_MONITOR_FILE.to_string(),
             monitor_addr: DEFAULT_MONITOR_ADDR.to_string(),
+            test_mode: false,
+            local_ip: None,
+            public_ip: None,
         }
     }
 }
@@ -163,9 +172,6 @@ impl Config {
         }
         if let Some(value) = map.get("keypair-path").and_then(|value| value.as_str()) {
             config.keypair_path = Some(value.to_owned())
-        }
-        if let Some(value) = map.get("network").and_then(|value| value.as_str()) {
-            config.network = value.to_owned();
         }
         if let Some(value) = map.get("rest-addr").and_then(|value| value.as_str()) {
             config.rest_addr = value.to_owned();
@@ -212,7 +218,15 @@ impl Config {
         if let Some(value) = map.get("wm-cache-max").and_then(|value| value.as_integer()) {
             config.wm_cache_max = value as usize;
         }
-
+        if let Some(value) = map.get("test-mode").and_then(|value| value.as_bool()) {
+            config.test_mode = value;
+        }
+        if let Some(value) = map.get("local-ip").and_then(|value| value.as_str()) {
+            config.local_ip = Some(value.to_owned());
+        }
+        if let Some(value) = map.get("public-ip").and_then(|value| value.as_str()) {
+            config.public_ip = Some(value.to_owned());
+        }
         Some(config)
     }
 }
@@ -237,16 +251,6 @@ pub fn create_app_config() -> Config {
                 .value_name("LEVEL")
                 .required(false)
                 .possible_values(&["off", "error", "warn", "info", "debug", "trace"]),
-        )
-        .arg(
-            clap::Arg::with_name("network")
-                .long("network")
-                .help(&format!(
-                    "Blockchain network identifier (default '{}')",
-                    DEFAULT_NETWORK_ID
-                ))
-                .value_name("NETWORK-NAME")
-                .required(false),
         )
         .arg(
             clap::Arg::with_name("db-path")
@@ -328,6 +332,26 @@ pub fn create_app_config() -> Config {
                 .value_name("ADDRESS")
                 .required(false),
         )
+        .arg(
+            clap::Arg::with_name("test-mode")
+            .short("t")
+            .long("test-mode")
+            .help("Test mode - the kad network is not started")
+        )
+        .arg(
+            clap::Arg::with_name("local-ip")
+            .long("local-ip")
+            .help("Populate the local ip info (default None)")
+            .value_name("IP")
+            .required(false),
+        )
+        .arg(
+            clap::Arg::with_name("public-ip")
+            .long("public-ip")
+            .help("Populate the public ip info (default None)")
+            .value_name("IP")
+            .required(false),
+        )
         .get_matches();
 
     let config_file = matches.value_of("config").unwrap_or(DEFAULT_CONFIG_FILE);
@@ -336,9 +360,6 @@ pub fn create_app_config() -> Config {
     // Tweak configuration using command line arguments.
     if let Some(value) = matches.value_of("log-level") {
         config.log_level = value.to_owned();
-    }
-    if let Some(value) = matches.value_of("network") {
-        config.network = value.to_owned();
     }
     if let Some(value) = matches.value_of("db-path") {
         config.db_path = value.to_owned();
@@ -381,6 +402,15 @@ pub fn create_app_config() -> Config {
     }
     if let Some(value) = matches.value_of("monitor-addr") {
         config.monitor_addr = value.to_owned();
+    }
+    if let Some(value) = matches.value_of("public-ip") {
+        config.public_ip = Some(value.to_owned());
+    }
+    if let Some(value) = matches.value_of("local-ip") {
+        config.local_ip = Some(value.to_owned());
+    }
+    if matches.is_present("test-mode") {
+        config.test_mode = true;
     }
     config
 }
@@ -433,7 +463,7 @@ mod tests {
         Config {
             log_level: "debug".to_string(),
             keypair_path: None,
-            network: "dummy_network".to_string(),
+            network: "bootstrap".to_string(),
             block_threshold: 1234,
             block_timeout: 4321,
             rest_addr: "1.2.3.4".to_string(),
@@ -449,6 +479,9 @@ mod tests {
             monitor_file: "blackbox.info".to_string(),
             monitor_addr: "https://dev.exchange.affidaty.net/api/v1/nodesMonitor/update"
                 .to_string(),
+            test_mode: false,
+            local_ip: None,
+            public_ip: None,
         }
     }
 

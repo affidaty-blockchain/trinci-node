@@ -12,16 +12,12 @@ log-level = "debug"
 
 # Node keypair file.
 # Default: dynamically generated
-keypair-path = "ed25519_keypair.bin"
+#keypair-path = "ed25519_keypair.bin"
 
 # Node bootstrap file in WASM format.
 # Default: "bootstrap.bin"
 bootstrap-path = "bootstrap.bin"
 #bootstrap-path = "service.wasm"
-
-# Network indentifier.
-# Default: "skynet".
-network = "bootstrap"
 
 # Http service address.
 # Default: 127.0.0.1
@@ -39,22 +35,19 @@ bridge-addr = "127.0.0.1"
 # Default: 8001
 bridge-port = 8001
 
+# P2P bootstrap address
+# Default: empty
+# uncomment the follow to sync with trinci testnet
+#p2p-bootstrap-addr = "12D3KooWEAxyiTiBgx8MUtTPUu29VLasimzscC84jTVRtMb5JjGZ@/ip4/15.161.71.249/tcp/9006"
+
 # P2P service address.
 # Default: 127.0.0.1
-p2p-addr = "127.0.0.1"
+# use 0.0.0.0
+p2p-addr = "0.0.0.0"
 
 # P2P service port.
 # Default: 0 (random)
 p2p-port = 9000
-
-# Max number of transactions per block.
-# Default: 42
-block-threshold = 1
-
-# Max time (in seconds) that a transaction is left in the unconfirmed transaction
-# pool before try to generate a new block.
-# Default: 3
-block-timeout = 5
 
 # Database path within the file system.
 # Default: "db"
@@ -63,3 +56,7 @@ db-path = "db"
 # Wasm machine max number of cached contracts.
 # Default: 10 (totally arbitrary value)
 wm-cache-max = 10
+
+# Test mode - prevent kad from start
+# Default: false
+#test-mode = true
