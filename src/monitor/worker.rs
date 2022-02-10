@@ -23,12 +23,10 @@
 //              request dynamic infos to core via GetCoreStatsRequest to blockchain
 //              recive infos via GetCoreStatsresponse
 //              send infos to all the stations
-use ascii_table::{Align, AsciiTable, Column};
+use ascii_table::{Align, AsciiTable};
 use isahc::{Request, RequestExt};
 use serde::Serialize;
-use std::{
-    collections::BTreeMap, fmt::Display, fs::File, io::Write, thread::sleep, time::Duration,
-};
+use std::{fmt::Display, fs::File, io::Write, thread::sleep, time::Duration};
 #[cfg(feature = "monitor")]
 use trinci_core::{
     blockchain::BlockRequestSender,
@@ -188,25 +186,16 @@ impl MonitorWorker {
 
     /// Saves node status in a human readable format in the `file` specified
     fn save_update(&mut self, file: String) {
-        // write structure in file
-        let mut columns = BTreeMap::new();
-        let column_field = Column {
-            header: "field".into(),
-            align: Align::Left,
-            max_width: 100,
-        };
-        let column_vals = Column {
-            header: "value".into(),
-            align: Align::Center,
-            max_width: 100,
-        };
-        columns.insert(0, column_field);
-        columns.insert(1, column_vals);
-        let mut ascii_table = AsciiTable {
-            max_width: 100,
-            columns,
-        };
-        ascii_table.max_width = 100;
+        let mut ascii_table = AsciiTable::default();
+        ascii_table.set_max_width(100);
+        ascii_table
+            .column(0)
+            .set_header("field")
+            .set_align(Align::Left);
+        ascii_table
+            .column(1)
+            .set_header("value")
+            .set_align(Align::Center);
 
         // data preparation
         let role = match &self.config.data.role {

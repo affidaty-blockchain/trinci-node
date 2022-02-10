@@ -424,6 +424,8 @@ impl App {
                 accept_broadcast: false,
                 block_threshold,
                 block_timeout: 2, // The genesis block will be executed after this timeout and not with block_threshold transactions in the pool // FIXME
+                is_production: false,
+                min_node_version: String::from("0.2.6"),
             });
 
             let block_svc = self.block_svc.clone();
