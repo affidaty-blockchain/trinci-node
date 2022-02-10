@@ -19,13 +19,13 @@
 use crate::monitor::{self, service::MonitorService, worker::MonitorConfig};
 use crate::{config::Config, config::SERVICE_ACCOUNT_ID};
 use serde::{Deserialize, Serialize};
-use std::os::unix::prelude::PermissionsExt;
 use std::sync::Arc;
 use trinci_core::base::BlockchainSettings;
 use trinci_core::crypto::drand::SeedSource;
 use trinci_core::crypto::{Hash, HashAlgorithm};
 use trinci_core::db::DbFork;
-use trinci_core::Account;
+use trinci_core::{Account, VERSION};
+use version_compare::Cmp;
 
 use trinci_core::{
     base::{
@@ -348,6 +348,18 @@ impl App {
             .wm_arc()
             .lock()
             .set_mode(config.is_production);
+
+        // check core verison
+        let version = VERSION;
+        match version_compare::compare(version, config.min_node_version.clone()) {
+            Ok(Cmp::Lt) => {
+                panic!(
+                    "Error: The core version is lower than the minumum accepted by the bootstrap"
+                )
+            }
+            Ok(_) => (),
+            Err(_) => panic!("Error: Version comparing failure"),
+        }
 
         let network_name = config.network_name.clone().unwrap(); // If this fails is at the very beginning
         info!("network name: {:?}", network_name);
