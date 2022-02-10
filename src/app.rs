@@ -130,14 +130,11 @@ fn bootstrap_monitor(chan: BlockRequestSender) {
         match res_chan.recv_sync() {
             Ok(Message::GetBlockResponse { .. }) => {
                 if is_service_present(&chan) {
-                    debug!(
-                        "Bootstrap is over, switching to a better validator check..."
-                    );
+                    debug!("Bootstrap is over, switching to a better validator check...");
 
                     break;
                 } else {
-                    error!("Block constructed but 'service' account is not yet active");
-                    panic!();
+                    panic!("Block constructed but 'service' account is not yet active");
                 }
             }
             Ok(res) => warn!("Bootstrap unexpected message: {:?}", res),
@@ -411,7 +408,6 @@ impl App {
             self.p2p_svc.lock().set_network_name(network_name);
             p2p_start = true;
         } else {
-
             // Load the Bootstrap Struct from file
             let (good_network_name, bootstrap_bin, bootstrap_txs) =
                 load_bootstrap_struct_from_file(&self.bootstrap_path);
@@ -439,7 +435,6 @@ impl App {
             let p2p_svc = self.p2p_svc.clone();
 
             if bootstrap_txs.is_empty() {
-
                 let wm = self.block_svc.lock().wm_arc();
                 let db = self.block_svc.lock().db_arc();
 
@@ -476,7 +471,6 @@ impl App {
                 });
                 p2p_start = false;
             } else {
-
                 self.put_txs_in_the_pool(bootstrap_txs);
 
                 bootstrap_monitor(chan.clone()); // Blocking function
