@@ -19,6 +19,7 @@
 use crate::monitor::{self, service::MonitorService, worker::MonitorConfig};
 use crate::{config::Config, config::SERVICE_ACCOUNT_ID};
 use serde::{Deserialize, Serialize};
+use std::os::unix::prelude::PermissionsExt;
 use std::sync::Arc;
 use trinci_core::base::BlockchainSettings;
 use trinci_core::crypto::drand::SeedSource;
@@ -341,8 +342,15 @@ impl App {
         let buf = db.read().load_configuration("blockchain:settings").unwrap(); // If this fails is at the very beginning
         let config = rmp_deserialize::<BlockchainSettings>(&buf).unwrap(); // If this fails is at the very beginning
 
+        // update node execution modality
+        self.block_svc
+            .lock()
+            .wm_arc()
+            .lock()
+            .set_mode(config.is_production);
+
         let network_name = config.network_name.clone().unwrap(); // If this fails is at the very beginning
-        warn!("network name: {:?}", network_name);
+        info!("network name: {:?}", network_name);
         self.set_block_service_config(config);
         network_name
     }
@@ -424,7 +432,7 @@ impl App {
                 accept_broadcast: false,
                 block_threshold,
                 block_timeout: 2, // The genesis block will be executed after this timeout and not with block_threshold transactions in the pool // FIXME
-                is_production: false,
+                is_production: true,
                 min_node_version: String::from("0.2.6"),
             });
 
