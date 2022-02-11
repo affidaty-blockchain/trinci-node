@@ -112,8 +112,8 @@ pub struct Config {
     pub monitor_file: String,
     /// Monitor addr.
     pub monitor_addr: String,
-    /// Test mode.
-    pub test_mode: bool,
+    /// Offline mode.
+    pub offline: bool,
     /// Local IP.
     pub local_ip: Option<String>,
     /// IP seen from the extern.
@@ -140,7 +140,7 @@ impl Default for Config {
             wm_cache_max: DEFAULT_WM_CACHE_MAX,
             monitor_file: DEFAULT_MONITOR_FILE.to_string(),
             monitor_addr: DEFAULT_MONITOR_ADDR.to_string(),
-            test_mode: false,
+            offline: false,
             local_ip: None,
             public_ip: None,
         }
@@ -218,8 +218,8 @@ impl Config {
         if let Some(value) = map.get("wm-cache-max").and_then(|value| value.as_integer()) {
             config.wm_cache_max = value as usize;
         }
-        if let Some(value) = map.get("test-mode").and_then(|value| value.as_bool()) {
-            config.test_mode = value;
+        if let Some(value) = map.get("offline").and_then(|value| value.as_bool()) {
+            config.offline = value;
         }
         if let Some(value) = map.get("local-ip").and_then(|value| value.as_str()) {
             config.local_ip = Some(value.to_owned());
@@ -333,10 +333,9 @@ pub fn create_app_config() -> Config {
                 .required(false),
         )
         .arg(
-            clap::Arg::with_name("test-mode")
-            .short("t")
-            .long("test-mode")
-            .help("Test mode - the kad network is not started")
+            clap::Arg::with_name("offline")
+            .long("offline")
+            .help("Offline mode - the kad network is not started")
         )
         .arg(
             clap::Arg::with_name("local-ip")
@@ -409,8 +408,8 @@ pub fn create_app_config() -> Config {
     if let Some(value) = matches.value_of("local-ip") {
         config.local_ip = Some(value.to_owned());
     }
-    if matches.is_present("test-mode") {
-        config.test_mode = true;
+    if matches.is_present("offline") {
+        config.offline = true;
     }
     config
 }
@@ -479,7 +478,7 @@ mod tests {
             monitor_file: "blackbox.info".to_string(),
             monitor_addr: "https://dev.exchange.affidaty.net/api/v1/nodesMonitor/update"
                 .to_string(),
-            test_mode: false,
+            offline: false,
             local_ip: None,
             public_ip: None,
         }

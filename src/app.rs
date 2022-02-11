@@ -131,13 +131,11 @@ fn bootstrap_monitor(chan: BlockRequestSender) {
         match res_chan.recv_sync() {
             Ok(Message::GetBlockResponse { .. }) => {
                 if is_service_present(&chan) {
-                    debug!(
-                        "Bootstrap is over, switching to a better loader and validator check..."
-                    );
+                    debug!("Bootstrap is over, switching to a better validator check...");
 
                     break;
                 } else {
-                    warn!("Block constructed but 'service' account is not yet active");
+                    panic!("Block constructed but 'service' account is not yet active");
                 }
             }
             Ok(res) => warn!("Bootstrap unexpected message: {:?}", res),
@@ -166,7 +164,7 @@ fn load_bootstrap_struct_from_file(path: &str) -> (String, Vec<u8>, Vec<Transact
 
     match rmp_deserialize::<Bootstrap>(&buf) {
         Ok(bs) => (calculate_network_name(&buf), bs.bin, bs.txs),
-        Err(_) => (calculate_network_name(&buf), buf, vec![]),
+        Err(_) => panic!("Invalid bootstrap file format!"), // If the bootstrap is not valid should panic!
     }
 }
 #[derive(Serialize, Deserialize)]
@@ -266,7 +264,7 @@ impl App {
             network: Mutex::new(config.network.clone()),
             bootstrap_addr: config.p2p_bootstrap_addr.clone(),
             p2p_keypair: Some(p2p_keypair),
-            active: !config.test_mode,
+            active: !config.offline,
         };
         let p2p_svc = PeerService::new(p2p_config, chan.clone());
 
@@ -332,6 +330,9 @@ impl App {
             config.block_threshold,
             config.block_timeout,
         );
+        self.block_svc
+            .lock()
+            .set_burn_fuel_method(config.burning_fuel_method);
         self.block_svc.lock().start();
     }
 
@@ -364,6 +365,7 @@ impl App {
         let network_name = config.network_name.clone().unwrap(); // If this fails is at the very beginning
         info!("network name: {:?}", network_name);
         self.set_block_service_config(config);
+
         network_name
     }
 
@@ -440,10 +442,11 @@ impl App {
             };
 
             self.set_block_service_config(BlockchainSettings {
-                network_name: Some("bootstrap".to_string()),
                 accept_broadcast: false,
                 block_threshold,
-                block_timeout: 2, // The genesis block will be executed after this timeout and not with block_threshold transactions in the pool // FIXME
+                block_timeout: 2,
+                burning_fuel_method: String::new(),
+                network_name: Some("bootstrap".to_string()), // The genesis block will be executed after this timeout and not with block_threshold transactions in the pool // FIXME
                 is_production: true,
                 min_node_version: String::from("0.2.6"),
             });
@@ -472,6 +475,9 @@ impl App {
                         config.block_threshold,
                         config.block_timeout,
                     );
+
+                    // Set the burn fuel method name
+                    bs.set_burn_fuel_method(config.burning_fuel_method.clone());
 
                     // Store the configuration on the DB
                     bs.store_config_into_db(config);

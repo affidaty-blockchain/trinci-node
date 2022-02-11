@@ -30,7 +30,7 @@ Additional labels for pre-release metadata:
 ------------------
 Changed
 * BlockchainSettings struct
-
+* `test-mode` flag renamed in `offline`
 
 0.2.6 - 08-02-2022
 ------------------

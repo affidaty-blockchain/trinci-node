@@ -349,7 +349,7 @@ impl MonitorWorker {
     pub fn run(&mut self, addr: String, file: String) {
         debug!("[monitor] running, monitor data updated every 5 min");
 
-        // retireve network id
+        // retrieve network id
         let request = Message::GetNetworkIdRequest;
         let rx_chan = match self.bc_chan.send_sync(request) {
             Ok(rx_chan) => rx_chan,
