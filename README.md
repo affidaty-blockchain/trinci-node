@@ -96,13 +96,13 @@ where:
 - `BS_PATH`: bootstrap path.
 
 
-# 🧪 Test mode
+# 🧪 Offline mode
 In order to start the node without kad support (eg for local testing) we can use the flag:
 
->`-t, --test-mode`    Test mode - the kad network is not started
+>`--offline`    Offline mode - the kad network is not started
 
 ```
-$ cargo run -- --test-mode
+$ cargo run -- --Offline-mode
 ```
 
 # ⚠️ Additional Remarks

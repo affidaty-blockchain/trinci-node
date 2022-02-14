@@ -8,7 +8,7 @@ keywords = ["trinci", "blockchain", "node"]
 
 [dependencies]
 #RESTORE BEFORE MERGE IN MASTER trinci-core = { git = "https://github.com/affidaty-blockchain/trinci-core" }
-trinci-core = { path = "../trinci-core" }
+trinci-core = { git = "https://ignore:icnAD-JTWci6TqfroMP7@gitlab.affidaty.net/developer2/trinci-github/trinci-core.git", branch = "develop" }
 
 log = { version = "0.4.14", features = ["release_max_level_info"] }
 clap = "2.34.0"
@@ -28,6 +28,8 @@ serde_json = { version = "1.0", optional = true }
 isahc = { version = "1.6.0", optional = true }
 # pretty print on file
 ascii_table = { version = "4.0.2", optional = true }
+# versioning comparer
+version-compare = "0.1.0"
 
 [dev-dependencies]
 glob = "0.3.0"
