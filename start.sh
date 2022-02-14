@@ -6,6 +6,7 @@ HTTP_PORT=8000
 BS_PATH='./data/bootstrap.bin'
 BS_IP_ADDR='15.161.71.249' 
 BS_ADDR='@/ip4/15.161.71.249/tcp/9006'
+DB_PATH='./db/'
 
 # Output settings.
 STEP_CODE="\033[0;33m"
@@ -67,6 +68,18 @@ bs_addr="${bs_id}${BS_ADDR}"
 echo -e "${STEP_CODE}Bootstrap address: $bs_addr\n ${CLEAN_CODE}"
 
 
+# Calculating DB path
+if [! -f "bootstrap.bin"]; then
+    echo -e "${ERROR_CODE}Missing bootstrap file. \n${CLEAN_CODE}"
+    exit 1
+fi
+
+echo -e "${SUCCESS_CODE}Calculating DB path... \n ${CLEAN_CODE}"
+bootstrap_hash=`shasum -a 256 bootstrap.bin | cut -f1 -d' '`
+db_path="${DB_PATH}${bootstrap_hash}/"
+echo -e "${STEP_CODE}DB path: $db_path ${CLEAN_CODE}"
+
+
 # Launch node.
 if [ ! -f "./target/release/trinci-node" ]; then
     echo -e "${ERROR_CODE}Missing trinci executable. \n${CLEAN_CODE}"
@@ -77,11 +90,11 @@ echo -e "${SUCCESS_CODE}Starting trinci node... \n ${CLEAN_CODE}"
 
 if [ -z "${endpoint_ip}" ]; then
 	# If uPnP went wrong.
-	./target/release/trinci-node --local-ip $local_ip --public-ip $public_ip --http-port $HTTP_PORT --bootstrap-path $BS_PATH --p2p-bootstrap-addr $bs_addr 
+	./target/release/trinci-node --local-ip $local_ip --public-ip $public_ip --http-port $HTTP_PORT --bootstrap-path $BS_PATH --p2p-bootstrap-addr $bs_addr --db-path $db_path
 elif [ -z "${public_ip}" ]; then
 	# If no public IP.
-	./target/release/trinci-node --local-ip $local_ip --http-port $HTTP_PORT --p2p-port ${arrEndpointIp[1]} --bootstrap-path $BS_PATH --p2p-bootstrap-addr $bs_addr 
+	./target/release/trinci-node --local-ip $local_ip --http-port $HTTP_PORT --p2p-port ${arrEndpointIp[1]} --bootstrap-path $BS_PATH --p2p-bootstrap-addr $bs_addr --db-path $db_path 
 else
 	# If all went good
-	./target/release/trinci-node --local-ip $local_ip --public-ip $public_ip:${arrEndpointIp[1]} --http-port $HTTP_PORT --p2p-port ${arrEndpointIp[1]} --bootstrap-path $BS_PATH --p2p-bootstrap-addr $bs_addr 
+	./target/release/trinci-node --local-ip $local_ip --public-ip $public_ip:${arrEndpointIp[1]} --http-port $HTTP_PORT --p2p-port ${arrEndpointIp[1]} --bootstrap-path $BS_PATH --p2p-bootstrap-addr $bs_addr --db-path $db_path  
 fi
