@@ -69,7 +69,7 @@ echo -e "${STEP_CODE}Bootstrap address: $bs_addr\n ${CLEAN_CODE}"
 
 
 # Calculating DB path
-if [! -f "bootstrap.bin"]; then
+if [ ! -f "bootstrap.bin" ]; then
     echo -e "${ERROR_CODE}Missing bootstrap file. \n${CLEAN_CODE}"
     exit 1
 fi
