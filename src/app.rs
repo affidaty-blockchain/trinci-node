@@ -239,7 +239,7 @@ impl App {
         #[cfg(feature = "monitor")]
         let seed_value = seed.get_seed();
 
-        // needed in p2p service and blockchain information gatering
+        // Needed in p2p service and blockchain information gatering
         let p2p_keypair = Ed25519KeyPair::from_random();
         let p2p_public_key: Ed25519PublicKey = p2p_keypair.public_key();
 
