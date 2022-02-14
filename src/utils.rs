@@ -44,10 +44,9 @@ pub fn load_keypair(filename: Option<String>) -> Result<KeyPair> {
                 file.read_to_end(&mut bytes).expect("loading node keypair");
                 if filename.contains("ecdsa") {
                     let ecdsa = ecdsa::KeyPair::from_pkcs8_bytes(ecdsa::CurveId::Secp256R1, &bytes)
-                        .unwrap_or(ecdsa::KeyPair::from_pkcs8_bytes(
-                            ecdsa::CurveId::Secp384R1,
-                            &bytes,
-                        )?);
+                        .or_else(|_| {
+                            ecdsa::KeyPair::from_pkcs8_bytes(ecdsa::CurveId::Secp384R1, &bytes)
+                        })?;
                     Ok(KeyPair::Ecdsa(ecdsa))
                 } else {
                     let ed25519 = ed25519::KeyPair::from_bytes(&bytes)?;
