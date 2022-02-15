@@ -71,8 +71,7 @@ pub const DEFAULT_WM_CACHE_MAX: usize = 10;
 pub const DEFAULT_MONITOR_FILE: &str = "blackbox.info";
 
 /// Default monitor addr.
-pub const DEFAULT_MONITOR_ADDR: &str =
-    "https://dev.exchange.affidaty.net/api/v1/nodesMonitor/update";
+pub const DEFAULT_MONITOR_ADDR: &str = "https://monitor.affidaty.net/api/v1/nodesMonitor/update";
 
 /// Core configuration structure.
 #[derive(PartialEq, Debug, Clone)]
@@ -328,7 +327,7 @@ pub fn create_app_config() -> Config {
         .arg(
             clap::Arg::with_name("monitor-addr")
                 .long("monitor-address")
-                .help("monitor addres to send POST req (default 'https://wowexchange.affidaty.net/api/v1/nodesMonitor/update')")
+                .help("monitor addres to send POST req (default 'https://monitor.affidaty.net/api/v1/nodesMonitor/update')")
                 .value_name("ADDRESS")
                 .required(false),
         )
@@ -476,8 +475,7 @@ mod tests {
             bootstrap_path: "dummy/boot/path".to_string(),
             wm_cache_max: 42,
             monitor_file: "blackbox.info".to_string(),
-            monitor_addr: "https://dev.exchange.affidaty.net/api/v1/nodesMonitor/update"
-                .to_string(),
+            monitor_addr: "https://monitor.affidaty.net/api/v1/nodesMonitor/update".to_string(),
             offline: false,
             local_ip: None,
             public_ip: None,
