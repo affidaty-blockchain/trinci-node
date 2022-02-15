@@ -14,70 +14,112 @@ CLEAN_CODE="\033[0m"
 SUCCESS_CODE="\033[0;32m"
 ERROR_CODE="\033[0;31m"
 
-echo -e "\nTrinci node start script v0.0.1 \n"
+echo -e "\nTrinci node start script v0.0.2 \n"
 
-echo -e "${SUCCESS_CODE}Gatering network informations... \n${CLEAN_CODE}"
-# Recover local ip.
-# Check which command use.
-if command -v ip &> /dev/null
-then
-    local_ip=`ip addr | sed -n -e '/state UP/,/[0-9]: / p' | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1' | tr '\n' '|'`
-    local_ip=${local_ip%?}
-fi
+unameOut="$(uname -s)"
+case "${unameOut}" in
+    Linux*)     ENVIRONMENT=Linux;;
+    Darwin*)    ENVIRONMENT=Mac;;
+esac
 
-if command -v ifconfig &> /dev/null
-then
-    local_ip=`ifconfig | sed -n -e '/UP/,/[0-9]: / p' | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1' | tr '\n' '|'`
-    local_ip=${local_ip%?}
-fi
+echo -e "${SUCCESS_CODE}Gatering system environment: ${STEP_CODE}$ENVIRONMENT${CLEAN_CODE}"
 
-if [ $? -ne 0 ]; then
-    echo -e "${ERROR_CODE}Something went wrong checking local ip addresses. \n${CLEAN_CODE}"
-    exit 1
-fi
+find_osx_local_ip_address() {
+    local_ip=`ifconfig | pcregrep -M -o '^[^\t:]+:([^\n]|\n\t)*status: active' | grep -w inet | awk '{print $2}'`
+    if [ $? -ne 0 ]; then
+        echo -e "${ERROR_CODE}Something went wrong checking local ip addresses. \n${CLEAN_CODE}"
+        exit 1
+    fi
+    # uPnP operation to deal externa ip.
+    target_ip=$local_ip
 
-echo -e "${STEP_CODE}Local IPs: $local_ip ${CLEAN_CODE}"
+    echo -e "${STEP_CODE}Local IPs: $local_ip ${CLEAN_CODE}"
+}
 
-# uPnP operation to deal externa ip.
-target_ip=`hostname -I | awk '{print $1}'`
+find_linux_local_ip_address() {
+    echo -e "${SUCCESS_CODE}Gatering network informations... \n${CLEAN_CODE}"
 
-if command -v dig &> /dev/null
-then
-    public_ip=`dig +short myip.opendns.com @resolver1.opendns.com`
+    # Recover local ip.
+    # Check which command use.
+    if command -v ip &> /dev/null
+    then
+        local_ip=`ip addr | sed -n -e '/state UP/,/[0-9]: / p' | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1' | tr '\n' '|'`
+        local_ip=${local_ip%?}
+    fi
+
+    if command -v ifconfig &> /dev/null
+    then
+        local_ip=`ifconfig | sed -n -e '/UP/,/[0-9]: / p' | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1' | tr '\n' '|'`
+        local_ip=${local_ip%?}
+    fi
+
+    if [ $? -ne 0 ]; then
+        echo -e "${ERROR_CODE}Something went wrong checking local ip addresses. \n${CLEAN_CODE}"
+        exit 1
+    fi
+
+    # uPnP operation to deal externa ip.
+    target_ip=`hostname -I | awk '{print $1}'`
+
+    echo -e "${STEP_CODE}Local IPs: $local_ip ${CLEAN_CODE}"
+}
+
+find_remote_ip_address() {
+    if command -v dig &> /dev/null
+    then
+        public_ip=`dig TXT +short o-o.myaddr.l.google.com @ns1.google.com`
+        public_ip=`echo $public_ip | tr -d '"'`
+    else
+        echo -e "${ERROR_CODE}Dig command is missing, please install dnsutils to continue. \n${CLEAN_CODE}"
+        exit 1
+    fi
+    echo -e "${STEP_CODE}Public IPs: $public_ip ${CLEAN_CODE}"
+}
+
+negotiate_upnp_port() {
+    echo -e "${SUCCESS_CODE}\nHandshaking port for P2P ${CLEAN_CODE}" 
+    endpoint_ip=`./tools/upnp_negotiator/target/release/upnp_negotiator $target_ip $TARGET_PORT`
+    arrEndpointIp=(${endpoint_ip//:/ })
+
+    if [ -z "${endpoint_ip}" ]; then
+        echo -e "${ERROR_CODE}Handshaking went wrong, running node w/o P2P port ${CLEAN_CODE}" 
+        echo -e "${STEP_CODE}Endpoint IP: $public_ip \n ${CLEAN_CODE}"
+    else	
+        echo -e "${STEP_CODE}Endpoint IP: $public_ip:${arrEndpointIp[1]} \n ${CLEAN_CODE}"
+    fi
+}
+
+get_bs_address() {
+    # Retrieve BS addr ID
+    echo -e "${SUCCESS_CODE}Retrieving P2P bootstrap ID... ${CLEAN_CODE}"
+    bs_id=`curl -s http://testnet.trinci.net/api/v1/p2p/id` 
+    bs_addr="${bs_id}${BS_ADDR}"
+    echo -e "${STEP_CODE}Bootstrap address: $bs_addr\n ${CLEAN_CODE}"
+}
+
+get_db_folder() {
+
+    # Calculating DB path
+    if [ ! -f "bootstrap.bin" ]; then
+        echo -e "${ERROR_CODE}Missing bootstrap file. \n${CLEAN_CODE}"
+        exit 1
+    fi
+
+    echo -e "${SUCCESS_CODE}Calculating DB path...${CLEAN_CODE}"
+    bootstrap_hash=`shasum -a 256 bootstrap.bin | cut -f1 -d' '`
+    db_path="${DB_PATH}${bootstrap_hash}/"
+    echo -e "${STEP_CODE}DB path: $db_path ${CLEAN_CODE}"
+}
+
+if [ $ENVIRONMENT == "Linux" ]; then
+    find_linux_local_ip_address
 else
-    echo -e "${ERROR_CODE}Dig command is missing, please install dnsutils to continue. \n${CLEAN_CODE}"
-    exit 1
+    find_osx_local_ip_address
 fi
-
-echo -e "${STEP_CODE}Public IPs: $public_ip ${CLEAN_CODE}"
-echo -e "${SUCCESS_CODE}\nHandshaking port for P2P ${CLEAN_CODE}" 
-endpoint_ip=`./tools/upnp_negotiator/target/release/upnp_negotiator $target_ip $TARGET_PORT`
-arrEndpointIp=(${endpoint_ip//:/ })
-
-if [ -z "${endpoint_ip}" ]; then
-	echo -e "${ERROR_CODE}Handshaking went wrong, running node w/o P2P port ${CLEAN_CODE}" 
-	echo -e "${STEP_CODE}Endpoint IP: $public_ip \n ${CLEAN_CODE}"
-else	
-	echo -e "${STEP_CODE}Endpoint IP: $public_ip:${arrEndpointIp[1]} \n ${CLEAN_CODE}"
-fi
-
-# Retrieve BS addr ID
-echo -e "${SUCCESS_CODE}Retrieving P2P bootstrap ID... \n ${CLEAN_CODE}"
-bs_id=`curl http://testnet.trinci.net/api/v1/p2p/id` 
-bs_addr="${bs_id}${BS_ADDR}"
-echo -e "${STEP_CODE}Bootstrap address: $bs_addr\n ${CLEAN_CODE}"
-
-
-# Calculating DB path
-if [ ! -f "bootstrap.bin" ]; then
-    echo -e "${ERROR_CODE}Missing bootstrap file. \n${CLEAN_CODE}"
-    exit 1
-fi
-
-echo -e "${SUCCESS_CODE}Calculating DB path... \n ${CLEAN_CODE}"
-bootstrap_hash=`shasum -a 256 bootstrap.bin | cut -f1 -d' '`
-db_path="${DB_PATH}${bootstrap_hash}/"
-echo -e "${STEP_CODE}DB path: $db_path ${CLEAN_CODE}"
+find_remote_ip_address
+negotiate_upnp_port
+get_bs_address
+get_db_folder
 
 
 # Launch node.
