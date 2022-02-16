@@ -26,7 +26,7 @@ Additional labels for pre-release metadata:
 * beta.x: shipped version under testing.
 * rc.x: stable release candidate.
 
-0.2.7 - unreleased
+0.2.7-rc1 - 16-02-2022
 ------------------
 Changed
 * BlockchainSettings struct
