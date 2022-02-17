@@ -579,7 +579,6 @@ impl App {
 mod tests {
     use crate::app::Bootstrap;
     use trinci_core::base::serialize::rmp_deserialize;
-    use trinci_core::crypto::ed25519::KeyPair as Ed25519KeyPair;
 
     #[ignore = "use this to check a boostrap file"]
     #[test]
@@ -594,14 +593,5 @@ mod tests {
         let bootstrap = bootstrap.unwrap();
         println!("{} Transactions", &bootstrap.txs.len());
         println!("nonce: `{}`", &bootstrap.nonce);
-    }
-
-    #[ignore = "use this to create a new ed25519 keypair"]
-    #[test]
-    fn create_ed25519_keypair() {
-        let ed25519_keypair = Ed25519KeyPair::from_random();
-        let bin = ed25519_keypair.to_bytes();
-        println! {"Account id: {}", ed25519_keypair.public_key().to_account_id()};
-        std::fs::write("keypair.bin", bin).unwrap();
     }
 }

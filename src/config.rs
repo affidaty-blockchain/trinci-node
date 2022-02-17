@@ -362,9 +362,6 @@ pub fn create_app_config() -> Config {
     if let Some(value) = matches.value_of("db-path") {
         config.db_path = value.to_owned();
     }
-    if let Some(value) = matches.value_of("boot-path") {
-        config.bootstrap_path = value.to_owned();
-    }
     if let Some(value) = matches.value_of("http-addr") {
         config.rest_addr = value.to_owned();
     }
