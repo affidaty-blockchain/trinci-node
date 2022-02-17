@@ -101,6 +101,8 @@ pub struct Config {
     pub p2p_port: u16,
     /// P2P service bootstrap address.
     pub p2p_bootstrap_addr: Option<String>,
+    /// P2P keypair.
+    pub p2p_keypair: Option<String>,
     /// Blockchain database folder path.
     pub db_path: String,
     /// Bootstrap wasm file path.
@@ -134,6 +136,7 @@ impl Default for Config {
             p2p_addr: DEFAULT_P2P_ADDR.to_string(),
             p2p_port: DEFAULT_P2P_PORT,
             p2p_bootstrap_addr: None,
+            p2p_keypair: None,
             db_path: DEFAULT_DB_PATH.to_string(),
             bootstrap_path: DEFAULT_BOOTSTRAP_PATH.to_string(),
             wm_cache_max: DEFAULT_WM_CACHE_MAX,
@@ -195,6 +198,9 @@ impl Config {
             .and_then(|value| value.as_str())
         {
             config.p2p_bootstrap_addr = Some(value.to_owned());
+        }
+        if let Some(value) = map.get("p2p-keypair").and_then(|value| value.as_str()) {
+            config.p2p_keypair = Some(value.to_owned())
         }
         if let Some(value) = map
             .get("block-threshold")
@@ -318,6 +324,13 @@ pub fn create_app_config() -> Config {
                 .required(false),
         )
         .arg(
+            clap::Arg::new("p2p-keypair")
+                .long("p2p-keypair")
+                .help("peer2peer kaypair [Ed25519] (default 'None')")
+                .value_name("PATH")
+                .required(false),
+        )
+        .arg(
             clap::Arg::new("monitor-file")
                 .long("monitor-file")
                 .help("monitor file location (default 'blackbox.info')")
@@ -391,6 +404,9 @@ pub fn create_app_config() -> Config {
     }
     if let Some(value) = matches.value_of("p2p-bootstrap-addr") {
         config.p2p_bootstrap_addr = Some(value.to_owned());
+    }
+    if let Some(value) = matches.value_of("p2p-keypair") {
+        config.p2p_keypair = Some(value.to_owned());
     }
     if let Some(value) = matches.value_of("monitor-file") {
         config.monitor_file = value.to_owned();
@@ -476,6 +492,7 @@ mod tests {
             offline: false,
             local_ip: None,
             public_ip: None,
+            p2p_keypair: None,
         }
     }
 

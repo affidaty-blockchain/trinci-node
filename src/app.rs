@@ -17,6 +17,7 @@
 
 #[cfg(feature = "monitor")]
 use crate::monitor::{self, service::MonitorService, worker::MonitorConfig};
+use crate::utils;
 use crate::{config::Config, config::SERVICE_ACCOUNT_ID};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -240,8 +241,19 @@ impl App {
         let seed_value = seed.get_seed();
 
         // Needed in p2p service and blockchain information gatering
-        let p2p_keypair = Ed25519KeyPair::from_random();
-        let p2p_public_key: Ed25519PublicKey = p2p_keypair.public_key();
+        let (p2p_public_key, p2p_keypair) = if config.p2p_keypair.is_some() {
+            let p2p_keypair = utils::load_keypair(config.p2p_keypair).unwrap();
+            let p2p_keypair = match p2p_keypair {
+                KeyPair::Ecdsa(_) => panic!("P2P keypair should be ED25519"),
+                KeyPair::Ed25519(kp) => kp,
+            };
+            debug!("[p2p] keypair loaded from file");
+            (p2p_keypair.public_key(), p2p_keypair)
+        } else {
+            let p2p_keypair = Ed25519KeyPair::from_random();
+            debug!("[p2p] keypair randomly generated");
+            (p2p_keypair.public_key(), p2p_keypair)
+        };
 
         let block_svc = BlockService::new(
             &keypair.public_key().to_account_id(),
