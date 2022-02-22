@@ -7,6 +7,7 @@ BS_PATH='./data/bootstrap.bin'
 BS_IP_ADDR='15.161.71.249' 
 BS_ADDR='@/ip4/15.161.71.249/tcp/9006'
 DB_PATH='./db/'
+BS_FILE="bootstrap.bin"
 
 # Output settings.
 STEP_CODE="\033[0;33m"
@@ -97,25 +98,77 @@ get_bs_address() {
     echo -e "${STEP_CODE}Bootstrap address: $bs_addr\n ${CLEAN_CODE}"
 }
 
-get_db_folder() {
-
-    # Calculating DB path
-    if [ ! -f "bootstrap.bin" ]; then
-        echo -e "${ERROR_CODE}Missing bootstrap file. \n${CLEAN_CODE}"
-        exit 1
-    fi
-
-    echo -e "${SUCCESS_CODE}Calculating DB path...${CLEAN_CODE}"
-    bootstrap_hash=`shasum -a 256 bootstrap.bin | cut -f1 -d' '`
-    db_path="${DB_PATH}${bootstrap_hash}/"
-    echo -e "${STEP_CODE}DB path: $db_path ${CLEAN_CODE}"
-}
+base58()
+if
+    local -a base58_chars=(
+    1 2 3 4 5 6 7 8 9
+      A B C D E F G H   J K L M N   P Q R S T U V W X Y Z
+      a b c d e f g h i j k   m n o p q r s t u v w x y z
+    )
+    local OPTIND OPTARG o
+    getopts d o
+then
+    shift $((OPTIND - 1))
+    case $o in
+      d)
+        local input
+        read -r input < "${1:-/dev/stdin}"
+        if [[ "$input" =~ ^1.+ ]]
+        then printf "\x00"; ${FUNCNAME[0]} -d <<<"${input:1}"
+        elif [[ "$input" =~ ^[$(printf %s ${base58_chars[@]})]+$ ]]
+        then
+      {
+        printf "s%c\n" "${base58_chars[@]}" | nl -v 0
+        sed -e i0 -e 's/./ 58*l&+/g' -e aP <<<"$input"
+      } | dc
+        elif [[ -n "$input" ]]
+        then return 1
+        fi |
+        if [[ -t 1 ]]
+        then cat -v
+        else cat
+        fi
+        ;;
+    esac
+else
+    xxd -p -u "${1:-/dev/stdin}" |
+    tr -d '\n' |
+    {
+      read hex
+      while [[ "$hex" =~ ^00 ]]
+      do echo -n 1; hex="${hex:2}"
+      done
+      if test -n "$hex"
+      then
+    dc -e "16i0$hex Ai[58~rd0<x]dsxx+f" |
+    while read -r
+    do echo -n "${base58_chars[REPLY]}"
+    done
+      fi
+      echo
+    }
+fi
 
 if [ $ENVIRONMENT == "Linux" ]; then
     find_linux_local_ip_address
 else
     find_osx_local_ip_address
 fi
+
+get_db_folder() {
+    # Calculating DB path
+    if [ ! -f $BS_FILE ]; then
+        echo -e "${ERROR_CODE}Missing bootstrap file. \n${CLEAN_CODE}"
+        exit 1
+    fi
+
+    echo -e "${SUCCESS_CODE}Calculating DB path...${CLEAN_CODE}"
+    bootstrap_hash=$(echo -n "1220"$(shasum -a 256 $BS_FILE | cut -f1 -d' ') | xxd -r -p | base58)
+    db_path="${DB_PATH}${bootstrap_hash}/"
+    echo -e "${STEP_CODE}DB path: $db_path ${CLEAN_CODE}"
+}
+
+
 find_remote_ip_address
 negotiate_upnp_port
 get_bs_address
