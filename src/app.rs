@@ -61,6 +61,8 @@ pub struct App {
     pub p2p_public_key: Ed25519PublicKey,
     /// Bootstrap path
     pub bootstrap_path: String,
+    /// Seed
+    pub seed: Arc<SeedSource>,
 }
 
 // If this panics, it panics early at node boot. Not a big deal.
@@ -93,6 +95,7 @@ fn is_validator_function_temporary(value: bool) -> impl IsValidator {
 fn is_validator_function_call(
     wm: Arc<Mutex<dyn Wm>>,
     db: Arc<RwLock<dyn Db<DbForkType = RocksDbFork>>>,
+    seed: Arc<SeedSource>,
 ) -> impl IsValidator {
     move |account_id: String| {
         let args = rmp_serialize(&account_id)?;
@@ -111,6 +114,7 @@ fn is_validator_function_call(
             None,
             "is_validator",
             &args,
+            seed.clone(),
             &mut events,
         )?;
 
@@ -240,7 +244,7 @@ impl App {
         #[cfg(feature = "monitor")]
         let seed_value = seed.get_seed();
 
-        // Needed in p2p service and blockchain information gatering
+        // Needed in p2p service and blockchain information gathering
         let (p2p_public_key, p2p_keypair) = if config.p2p_keypair.is_some() {
             let p2p_keypair = utils::load_keypair(config.p2p_keypair).unwrap();
             let p2p_keypair = match p2p_keypair {
@@ -261,7 +265,7 @@ impl App {
             block_config,
             db,
             wm,
-            seed,
+            seed.clone(),
             p2p_public_key.to_account_id(),
         );
         let chan = block_svc.request_channel();
@@ -333,6 +337,7 @@ impl App {
             keypair,
             #[cfg(feature = "monitor")]
             monitor_svc: Some(monitor_svc),
+            seed,
         }
     }
 
@@ -364,7 +369,7 @@ impl App {
             .lock()
             .set_mode(config.is_production);
 
-        // check core verison
+        // check core version
         let version = VERSION;
         match version_compare::compare(version, config.min_node_version.clone()) {
             Ok(Cmp::Lt) => {
@@ -435,7 +440,7 @@ impl App {
 
             let wm = self.block_svc.lock().wm_arc();
 
-            let is_validator = is_validator_function_call(wm, db);
+            let is_validator = is_validator_function_call(wm, db, self.seed.clone());
 
             self.set_block_service_is_validator(is_validator);
 
@@ -471,6 +476,7 @@ impl App {
             if bootstrap_txs.is_empty() {
                 let wm = self.block_svc.lock().wm_arc();
                 let db = self.block_svc.lock().db_arc();
+                let seed = self.seed.clone();
 
                 std::thread::spawn(move || {
                     bootstrap_monitor(chan.clone());
@@ -496,7 +502,7 @@ impl App {
                     // Store the configuration on the DB
                     bs.store_config_into_db(config);
 
-                    let is_validator = is_validator_function_call(wm.clone(), db.clone());
+                    let is_validator = is_validator_function_call(wm.clone(), db.clone(), seed);
                     bs.set_validator(is_validator);
 
                     bs.start();
@@ -521,7 +527,7 @@ impl App {
                 let wm = self.block_svc.lock().wm_arc();
                 let db = self.block_svc.lock().db_arc();
 
-                let is_validator = is_validator_function_call(wm, db);
+                let is_validator = is_validator_function_call(wm, db, self.seed.clone());
 
                 self.set_block_service_is_validator(is_validator);
 
