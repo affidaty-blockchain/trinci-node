@@ -240,7 +240,7 @@ impl App {
         #[cfg(feature = "monitor")]
         let seed_value = seed.get_seed();
 
-        // Needed in p2p service and blockchain information gatering
+        // Needed in p2p service and blockchain information gathering
         let (p2p_public_key, p2p_keypair) = if config.p2p_keypair.is_some() {
             let p2p_keypair = utils::load_keypair(config.p2p_keypair).unwrap();
             let p2p_keypair = match p2p_keypair {
@@ -357,14 +357,14 @@ impl App {
         let buf = db.read().load_configuration("blockchain:settings").unwrap(); // If this fails is at the very beginning
         let config = rmp_deserialize::<BlockchainSettings>(&buf).unwrap(); // If this fails is at the very beginning
 
-        // update node execution modality
+        // Update node execution modality
         self.block_svc
             .lock()
             .wm_arc()
             .lock()
             .set_mode(config.is_production);
 
-        // check core verison
+        // Check core version
         let version = VERSION;
         match version_compare::compare(version, config.min_node_version.clone()) {
             Ok(Cmp::Lt) => {
