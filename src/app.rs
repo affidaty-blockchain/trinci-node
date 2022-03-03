@@ -25,6 +25,7 @@ use trinci_core::base::BlockchainSettings;
 use trinci_core::crypto::drand::SeedSource;
 use trinci_core::crypto::{Hash, HashAlgorithm};
 use trinci_core::db::DbFork;
+use trinci_core::wm::local::INITIAL_FUEL;
 use trinci_core::{Account, VERSION};
 use version_compare::Cmp;
 
@@ -101,7 +102,7 @@ fn is_validator_function_call(
 
         let mut events = Vec::new();
 
-        let res = wm.lock().call(
+        let (_, res) = wm.lock().call_wm(
             &mut db,
             42,
             "",
@@ -112,6 +113,7 @@ fn is_validator_function_call(
             "is_validator",
             &args,
             &mut events,
+            INITIAL_FUEL,
         )?;
 
         rmp_deserialize(&res)
