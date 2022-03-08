@@ -440,8 +440,7 @@ mod tests {
         fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
             write!(
                 f,
-                "validator = 'FIXME'\n\
-                log-level = '{}'\n\
+                "log-level = '{}'\n\
                 network = '{}'\n\
                 block-threshold = {}\n\
                 block-timeout = {}\n\

@@ -98,12 +98,12 @@ fn is_validator_function_call(
     move |account_id: String| {
         let args = rmp_serialize(&account_id)?;
 
-        let mut db = db.write().fork_create();
+        let mut fork = db.write().fork_create();
 
         let mut events = Vec::new();
 
         let (_, res) = wm.lock().call_wm(
-            &mut db,
+            &mut fork,
             42,
             "",
             "",

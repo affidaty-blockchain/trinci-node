@@ -21,7 +21,7 @@
 // each t seconds:
 //              by using channel to blockchain dispatcher
 //              request dynamic infos to core via GetCoreStatsRequest to blockchain
-//              recive infos via GetCoreStatsresponse
+//              receive infos via GetCoreStatsresponse
 //              send infos to all the stations
 use ascii_table::{Align, AsciiTable};
 use isahc::{Request, RequestExt};
@@ -45,7 +45,7 @@ pub struct UnconfirmedPool {
 }
 
 #[derive(Serialize)]
-/// structure that holds the last block recieved by the node and its hash
+/// structure that holds the last block received by the node and its hash
 pub struct LastBlock {
     block: Block,
     hash: Hash,
@@ -63,8 +63,6 @@ pub struct P2pInfo {
 #[derive(Serialize)]
 pub struct NetworkConfig {
     pub name: String,
-    // it should be the bootstrap hash
-    //network_id: Hash, todo!()
     pub block_threshold: usize,
     pub block_timeout: u16,
 }
@@ -94,9 +92,9 @@ pub struct Status {
     pub core_version: String,
     /// last node's block
     pub last_block: Option<LastBlock>,
-    /// structure that holds some infomration about the unconfirmed tx queue
+    /// structure that holds some information about the unconfirmed tx queue
     pub unconfirmed_pool: Option<UnconfirmedPool>,
-    /// infos reuarding the p2p config
+    /// infos regarding the p2p config
     pub p2p_info: P2pInfo,
     /// seed
     pub seed: u64,
@@ -106,7 +104,7 @@ pub struct Status {
 
 // due to server interaction the Monitor server
 // structure needs this names as field
-/// It holds the node informations
+/// It holds the node information
 #[derive(Serialize)]
 #[allow(non_snake_case)]
 pub struct MonitorConfig {
@@ -134,7 +132,7 @@ impl MonitorWorker {
             self.config.data.last_block = Some(last_block);
         }
 
-        // retireve seed
+        // Retrieve the seed
         let request = Message::GetSeedRequest;
         let rx_chan = match self.bc_chan.send_sync(request) {
             Ok(rx_chan) => rx_chan,
@@ -246,7 +244,6 @@ impl MonitorWorker {
 
         let network_data: Vec<Vec<&dyn Display>> = vec![
             vec![&"network name", &self.config.data.nw_config.name],
-            //vec![&"network id", &network_id], todo!()
             vec![
                 &"block threshold",
                 &self.config.data.nw_config.block_threshold,
