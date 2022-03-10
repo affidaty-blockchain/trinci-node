@@ -29,7 +29,7 @@ Additional labels for pre-release metadata:
 0.2.7-rc1 - 16-02-2022
 ------------------
 Changed
-* BlockchainSettings struct
+* BlockchainSettings structure
 * `test-mode` flag renamed in `offline`
 
 0.2.6 - 08-02-2022
@@ -43,7 +43,7 @@ Changed
 
 Added
 * test mode to p2p module (prevent it from start)
-* ip address from commandline
+* ip address from command line
 
 Changed
 * new monitor architecture

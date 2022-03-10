@@ -17,7 +17,7 @@
 
 //! Node configuration
 //!
-//! Parameters to pragmatically tweak the core behaviour.
+//! Parameters to pragmatically tweak the core behavior.
 
 use std::{fs, path::Path};
 use toml::Value;
@@ -374,6 +374,9 @@ pub fn create_app_config() -> Config {
     }
     if let Some(value) = matches.value_of("db-path") {
         config.db_path = value.to_owned();
+    }
+    if let Some(value) = matches.value_of("bootstrap-path") {
+        config.bootstrap_path = value.to_owned();
     }
     if let Some(value) = matches.value_of("http-addr") {
         config.rest_addr = value.to_owned();
