@@ -362,14 +362,14 @@ impl App {
         let buf = db.read().load_configuration("blockchain:settings").unwrap(); // If this fails is at the very beginning
         let config = rmp_deserialize::<BlockchainSettings>(&buf).unwrap(); // If this fails is at the very beginning
 
-        // update node execution modality
+        // Update node execution modality
         self.block_svc
             .lock()
             .wm_arc()
             .lock()
             .set_mode(config.is_production);
 
-        // check core version
+        // Check core version
         let version = VERSION;
         match version_compare::compare(version, config.min_node_version.clone()) {
             Ok(Cmp::Lt) => {
