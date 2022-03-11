@@ -62,6 +62,8 @@ pub struct App {
     pub p2p_public_key: Ed25519PublicKey,
     /// Bootstrap path
     pub bootstrap_path: String,
+    /// Seed
+    pub seed: Arc<SeedSource>,
 }
 
 // If this panics, it panics early at node boot. Not a big deal.
@@ -263,7 +265,7 @@ impl App {
             block_config,
             db,
             wm,
-            seed,
+            seed.clone(),
             p2p_public_key.to_account_id(),
         );
         let chan = block_svc.request_channel();
@@ -335,6 +337,7 @@ impl App {
             keypair,
             #[cfg(feature = "monitor")]
             monitor_svc: Some(monitor_svc),
+            seed,
         }
     }
 
