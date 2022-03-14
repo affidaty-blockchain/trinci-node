@@ -280,6 +280,12 @@ impl App {
             p2p_keypair: Some(p2p_keypair),
             active: !config.offline,
         };
+        // DEBUG
+        debug!(
+            "P2P BOOT info: {:?}\nP2P my port: {}",
+            config.p2p_bootstrap_addr.clone(),
+            config.p2p_port
+        );
         let p2p_svc = PeerService::new(p2p_config, chan.clone());
 
         let bridge_config = BridgeConfig {
