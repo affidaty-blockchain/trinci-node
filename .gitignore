@@ -3,3 +3,4 @@ tools/upnp_negotiator/target
 db*
 Cargo.lock
 blackbox.info
+ed25519_keypair.bin

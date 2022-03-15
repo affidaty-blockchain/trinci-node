@@ -25,7 +25,7 @@ use trinci_core::base::BlockchainSettings;
 use trinci_core::crypto::drand::SeedSource;
 use trinci_core::crypto::{Hash, HashAlgorithm};
 use trinci_core::db::DbFork;
-use trinci_core::wm::local::INITIAL_FUEL;
+use trinci_core::wm::local::MAX_FUEL;
 use trinci_core::{Account, VERSION};
 use version_compare::Cmp;
 
@@ -96,27 +96,32 @@ fn is_validator_function_temporary(value: bool) -> impl IsValidator {
 fn is_validator_function_call(
     wm: Arc<Mutex<dyn Wm>>,
     db: Arc<RwLock<dyn Db<DbForkType = RocksDbFork>>>,
+    seed: Arc<SeedSource>,
 ) -> impl IsValidator {
     move |account_id: String| {
         let args = rmp_serialize(&account_id)?;
+
+        let seed = seed.clone();
 
         let mut fork = db.write().fork_create();
 
         let mut events = Vec::new();
 
-        let (_, res) = wm.lock().call_wm(
+        let (_, res) = wm.lock().call(
             &mut fork,
             42,
-            "",
-            "",
+            "skynet",
             SERVICE_ACCOUNT_ID,
-            "",
+            SERVICE_ACCOUNT_ID,
+            SERVICE_ACCOUNT_ID,
             None,
             "is_validator",
             &args,
+            seed,
             &mut events,
-            INITIAL_FUEL,
-        )?;
+            MAX_FUEL,
+        );
+        let res = res?;
 
         rmp_deserialize(&res)
     }
@@ -440,7 +445,7 @@ impl App {
 
             let wm = self.block_svc.lock().wm_arc();
 
-            let is_validator = is_validator_function_call(wm, db);
+            let is_validator = is_validator_function_call(wm, db, self.seed.clone());
 
             self.set_block_service_is_validator(is_validator);
 
@@ -476,6 +481,7 @@ impl App {
             if bootstrap_txs.is_empty() {
                 let wm = self.block_svc.lock().wm_arc();
                 let db = self.block_svc.lock().db_arc();
+                let seed = self.seed.clone();
 
                 std::thread::spawn(move || {
                     bootstrap_monitor(chan.clone());
@@ -501,7 +507,7 @@ impl App {
                     // Store the configuration on the DB
                     bs.store_config_into_db(config);
 
-                    let is_validator = is_validator_function_call(wm.clone(), db.clone());
+                    let is_validator = is_validator_function_call(wm.clone(), db.clone(), seed);
                     bs.set_validator(is_validator);
 
                     bs.start();
@@ -526,7 +532,7 @@ impl App {
                 let wm = self.block_svc.lock().wm_arc();
                 let db = self.block_svc.lock().db_arc();
 
-                let is_validator = is_validator_function_call(wm, db);
+                let is_validator = is_validator_function_call(wm, db, self.seed.clone());
 
                 self.set_block_service_is_validator(is_validator);
 
