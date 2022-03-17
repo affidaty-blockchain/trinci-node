@@ -26,6 +26,14 @@ Additional labels for pre-release metadata:
 * beta.x: shipped version under testing.
 * rc.x: stable release candidate.
 
+
+0.2.7-rc2 - unreleased
+----------------------
+* Call to Service `contract_updatable`
+* NFA Non-Fungible Account
+* Fixed Drand method
+* Monitor does not send data if offline mode is active
+
 0.2.7-rc1 - 16-02-2022
 ------------------
 Changed

@@ -98,12 +98,10 @@ pub struct Status {
     pub p2p_info: P2pInfo,
     /// seed
     pub seed: u64,
-    // TODO
-    //rcv_message_in_window: T,
 }
 
-// due to server interaction the Monitor server
-// structure needs this names as field
+/// Due to server interaction the Monitor server
+/// Structure needs this names as field
 /// It holds the node information
 #[derive(Serialize)]
 #[allow(non_snake_case)]
@@ -115,11 +113,16 @@ pub struct MonitorConfig {
 pub struct MonitorWorker {
     config: MonitorConfig,
     bc_chan: BlockRequestSender,
+    offline: bool,
 }
 
 impl MonitorWorker {
-    pub fn new(config: MonitorConfig, bc_chan: BlockRequestSender) -> Self {
-        MonitorWorker { config, bc_chan }
+    pub fn new(config: MonitorConfig, bc_chan: BlockRequestSender, offline: bool) -> Self {
+        MonitorWorker {
+            config,
+            bc_chan,
+            offline,
+        }
     }
 
     /// Updates node status
@@ -384,18 +387,20 @@ impl MonitorWorker {
 
             match rx_chan.recv_sync() {
                 Ok(Message::GetCoreStatsResponse(info)) => {
-                    if info.1 > 0 {
-                        let unconfirmed_pool = Some(UnconfirmedPool {
-                            hash: info.0,
-                            size: info.1,
-                        });
-                        self.update(info.2, unconfirmed_pool);
-                    } else {
-                        self.update(info.2, None)
-                    }
+                    if !self.offline {
+                        if info.1 > 0 {
+                            let unconfirmed_pool = Some(UnconfirmedPool {
+                                hash: info.0,
+                                size: info.1,
+                            });
+                            self.update(info.2, unconfirmed_pool);
+                        } else {
+                            self.update(info.2, None)
+                        }
 
-                    self.send_update(addr.clone());
-                    self.save_update(file.clone());
+                        self.send_update(addr.clone());
+                        self.save_update(file.clone());
+                    }
                 }
                 Ok(res) => {
                     warn!("[monitor] unexpected message {:?}", res);

@@ -25,8 +25,9 @@ use trinci_core::base::BlockchainSettings;
 use trinci_core::crypto::drand::SeedSource;
 use trinci_core::crypto::{Hash, HashAlgorithm};
 use trinci_core::db::DbFork;
-use trinci_core::wm::local::MAX_FUEL;
-use trinci_core::{Account, VERSION};
+
+use trinci_core::{wm::local::MAX_FUEL, Account, Error, VERSION};
+
 use version_compare::Cmp;
 
 use trinci_core::{
@@ -102,11 +103,19 @@ fn is_validator_function_call(
         let args = rmp_serialize(&account_id)?;
 
         let seed = seed.clone();
-
         let mut fork = db.write().fork_create();
-
         let mut events = Vec::new();
 
+        let account = fork
+            .load_account(SERVICE_ACCOUNT_ID)
+            .ok_or_else(|| Error::new_ext(ErrorKind::Other, "The Service Account must exist!"))?;
+
+        let contract = account.contract.ok_or_else(|| {
+            Error::new_ext(
+                ErrorKind::Other,
+                "The Service Account must have a contract!",
+            )
+        })?;
         let (_, res) = wm.lock().call(
             &mut fork,
             42,
@@ -114,7 +123,7 @@ fn is_validator_function_call(
             SERVICE_ACCOUNT_ID,
             SERVICE_ACCOUNT_ID,
             SERVICE_ACCOUNT_ID,
-            None,
+            contract,
             "is_validator",
             &args,
             seed,
@@ -329,7 +338,7 @@ impl App {
                 data: node_status,
             };
 
-            MonitorService::new(monitor_config, chan)
+            MonitorService::new(monitor_config, chan, config.offline)
         };
 
         App {
@@ -366,13 +375,6 @@ impl App {
         let db = block_svc.lock().db_arc();
         let buf = db.read().load_configuration("blockchain:settings").unwrap(); // If this fails is at the very beginning
         let config = rmp_deserialize::<BlockchainSettings>(&buf).unwrap(); // If this fails is at the very beginning
-
-        // Update node execution modality
-        self.block_svc
-            .lock()
-            .wm_arc()
-            .lock()
-            .set_mode(config.is_production);
 
         // Check core version
         let version = VERSION;
@@ -468,9 +470,9 @@ impl App {
             self.set_block_service_config(BlockchainSettings {
                 accept_broadcast: false,
                 block_threshold,
-                block_timeout: 2,
+                block_timeout: 2, // The genesis block will be executed after this timeout and not with block_threshold transactions in the pool // FIXME
                 burning_fuel_method: String::new(),
-                network_name: Some("bootstrap".to_string()), // The genesis block will be executed after this timeout and not with block_threshold transactions in the pool // FIXME
+                network_name: Some("bootstrap".to_string()),
                 is_production: true,
                 min_node_version: String::from("0.2.6"),
             });
