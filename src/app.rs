@@ -26,7 +26,7 @@ use trinci_core::crypto::drand::SeedSource;
 use trinci_core::crypto::{Hash, HashAlgorithm};
 use trinci_core::db::DbFork;
 
-use trinci_core::{wm::local::MAX_FUEL, Account, Error, VERSION};
+use trinci_core::{wm::MAX_FUEL, Account, Error, VERSION};
 
 use version_compare::Cmp;
 
