@@ -69,7 +69,7 @@ pub fn run(tx_chan: BlockRequestSender) {
                 tracer.update(block.data.height as usize, block.data.size as usize);
             }
             Ok(res) => {
-                warn!("[tracer] unexpected message {:?}", res);
+                info!("[tracer] Subscribe response: {:?}", res);
             }
             Err(_) => {
                 warn!("[tracer] blockchain channel closed");

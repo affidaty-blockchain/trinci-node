@@ -157,7 +157,7 @@ fn bootstrap_monitor(chan: BlockRequestSender) {
                     panic!("Block constructed but 'service' account is not yet active");
                 }
             }
-            Ok(res) => warn!("Bootstrap unexpected message: {:?}", res),
+            Ok(res) => info!("Bootstrap subscribe response: {:?}", res),
             Err(err) => error!("Channel error: {}", err),
         }
     }
