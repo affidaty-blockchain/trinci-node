@@ -98,6 +98,7 @@ fn is_validator_function_call(
     wm: Arc<Mutex<dyn Wm>>,
     db: Arc<RwLock<dyn Db<DbForkType = RocksDbFork>>>,
     seed: Arc<SeedSource>,
+    block_timestamp: u64,
 ) -> impl IsValidator {
     move |account_id: String| {
         let args = rmp_serialize(&account_id)?;
@@ -129,6 +130,7 @@ fn is_validator_function_call(
             seed,
             &mut events,
             MAX_FUEL,
+            block_timestamp,
         );
         let res = res?;
 
@@ -447,7 +449,7 @@ impl App {
 
             let wm = self.block_svc.lock().wm_arc();
 
-            let is_validator = is_validator_function_call(wm, db, self.seed.clone());
+            let is_validator = is_validator_function_call(wm, db, self.seed.clone(), 0);
 
             self.set_block_service_is_validator(is_validator);
 
@@ -509,7 +511,7 @@ impl App {
                     // Store the configuration on the DB
                     bs.store_config_into_db(config);
 
-                    let is_validator = is_validator_function_call(wm.clone(), db.clone(), seed);
+                    let is_validator = is_validator_function_call(wm.clone(), db.clone(), seed, 0);
                     bs.set_validator(is_validator);
 
                     bs.start();
@@ -534,7 +536,7 @@ impl App {
                 let wm = self.block_svc.lock().wm_arc();
                 let db = self.block_svc.lock().db_arc();
 
-                let is_validator = is_validator_function_call(wm, db, self.seed.clone());
+                let is_validator = is_validator_function_call(wm, db, self.seed.clone(), 0);
 
                 self.set_block_service_is_validator(is_validator);
 
