@@ -32,8 +32,8 @@ pub struct MonitorService {
 }
 
 impl MonitorService {
-    pub fn new(config: MonitorConfig, bc_chan: BlockRequestSender) -> Self {
-        let worker = MonitorWorker::new(config, bc_chan);
+    pub fn new(config: MonitorConfig, bc_chan: BlockRequestSender, offline: bool) -> Self {
+        let worker = MonitorWorker::new(config, bc_chan, offline);
 
         MonitorService {
             worker: Some(worker),

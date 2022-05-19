@@ -17,7 +17,7 @@
 
 //! Node configuration
 //!
-//! Parameters to pragmatically tweak the core behaviour.
+//! Parameters to pragmatically tweak the core behavior.
 
 use std::{fs, path::Path};
 use toml::Value;
@@ -101,6 +101,8 @@ pub struct Config {
     pub p2p_port: u16,
     /// P2P service bootstrap address.
     pub p2p_bootstrap_addr: Option<String>,
+    /// P2P keypair.
+    pub p2p_keypair: Option<String>,
     /// Blockchain database folder path.
     pub db_path: String,
     /// Bootstrap wasm file path.
@@ -134,6 +136,7 @@ impl Default for Config {
             p2p_addr: DEFAULT_P2P_ADDR.to_string(),
             p2p_port: DEFAULT_P2P_PORT,
             p2p_bootstrap_addr: None,
+            p2p_keypair: None,
             db_path: DEFAULT_DB_PATH.to_string(),
             bootstrap_path: DEFAULT_BOOTSTRAP_PATH.to_string(),
             wm_cache_max: DEFAULT_WM_CACHE_MAX,
@@ -196,6 +199,9 @@ impl Config {
         {
             config.p2p_bootstrap_addr = Some(value.to_owned());
         }
+        if let Some(value) = map.get("p2p-keypair").and_then(|value| value.as_str()) {
+            config.p2p_keypair = Some(value.to_owned())
+        }
         if let Some(value) = map
             .get("block-threshold")
             .and_then(|value| value.as_integer())
@@ -231,37 +237,37 @@ impl Config {
 }
 
 pub fn create_app_config() -> Config {
-    let matches = clap::App::new("T2 Node")
+    let matches = clap::Command::new("T2 Node")
         .version(clap::crate_version!())
         .author(clap::crate_authors!())
         .about(clap::crate_description!())
         .arg(
-            clap::Arg::with_name("config")
-                .short("c")
+            clap::Arg::new("config")
+                .short('c')
                 .long("config")
                 .help("Configuration file (default 'config.toml')")
                 .value_name("CONFIG")
                 .required(false),
         )
         .arg(
-            clap::Arg::with_name("log-level")
+            clap::Arg::new("log-level")
                 .long("log-level")
-                .help(&format!("Logger level (default '{}')", DEFAULT_LOG_LEVEL))
+                .help(&*format!("Logger level (default '{}')", DEFAULT_LOG_LEVEL))
                 .value_name("LEVEL")
                 .required(false)
                 .possible_values(&["off", "error", "warn", "info", "debug", "trace"]),
         )
         .arg(
-            clap::Arg::with_name("db-path")
+            clap::Arg::new("db-path")
                 .long("db-path")
-                .help(&format!("Database folder (default '{}')", DEFAULT_DB_PATH))
+                .help(&*format!("Database folder (default '{}')", DEFAULT_DB_PATH))
                 .value_name("PATH")
                 .required(false),
         )
         .arg(
-            clap::Arg::with_name("bootstrap-path")
+            clap::Arg::new("bootstrap-path")
                 .long("bootstrap-path")
-                .help(&format!(
+                .help(&*format!(
                     "Bootstrap wasm file path (default '{}')",
                     DEFAULT_BOOTSTRAP_PATH
                 ))
@@ -269,82 +275,89 @@ pub fn create_app_config() -> Config {
                 .required(false),
         )
         .arg(
-            clap::Arg::with_name("http-addr")
+            clap::Arg::new("http-addr")
                 .long("http-addr")
                 .help("Http service binding address (default '127.0.0.1')")
                 .value_name("ADDRESS")
                 .required(false),
         )
         .arg(
-            clap::Arg::with_name("http-port")
+            clap::Arg::new("http-port")
                 .long("http-port")
                 .help("Http service listening port (default '8000')")
                 .value_name("PORT")
                 .required(false),
         )
         .arg(
-            clap::Arg::with_name("bridge-addr")
+            clap::Arg::new("bridge-addr")
                 .long("bridge-addr")
                 .help("Bridge service binding address (default '127.0.0.1')")
                 .value_name("ADDRESS")
                 .required(false),
         )
         .arg(
-            clap::Arg::with_name("bridge-port")
+            clap::Arg::new("bridge-port")
                 .long("bridge-port")
                 .help("Bridge service listening port (default '8001')")
                 .value_name("PORT")
                 .required(false),
         )
         .arg(
-            clap::Arg::with_name("p2p-addr")
+            clap::Arg::new("p2p-addr")
                 .long("p2p-addr")
                 .help("P2P service binding address (default '127.0.0.1')")
                 .value_name("ADDRESS")
                 .required(false),
         )
         .arg(
-            clap::Arg::with_name("p2p-port")
+            clap::Arg::new("p2p-port")
                 .long("p2p-port")
                 .help("P2P service listening port (default '0')")
                 .value_name("PORT")
                 .required(false),
         )
         .arg(
-            clap::Arg::with_name("p2p-bootstrap-addr")
+            clap::Arg::new("p2p-bootstrap-addr")
                 .long("p2p-bootstrap-addr")
                 .help("peer2peer service bootstrap address (default '127.0.0.1')")
                 .value_name("ADDRESS")
                 .required(false),
         )
         .arg(
-            clap::Arg::with_name("monitor-file")
+            clap::Arg::new("p2p-keypair")
+                .long("p2p-keypair")
+                .help("peer2peer kaypair [Ed25519] (default 'None')")
+                .value_name("PATH")
+                .required(false),
+        )
+        .arg(
+            clap::Arg::new("monitor-file")
                 .long("monitor-file")
                 .help("monitor file location (default 'blackbox.info')")
                 .value_name("PATH")
                 .required(false),
         )
         .arg(
-            clap::Arg::with_name("monitor-addr")
+            clap::Arg::new("monitor-addr")
                 .long("monitor-address")
                 .help("monitor addres to send POST req (default 'https://monitor.affidaty.net/api/v1/nodesMonitor/update')")
                 .value_name("ADDRESS")
                 .required(false),
         )
         .arg(
-            clap::Arg::with_name("offline")
+            clap::Arg::new("offline")
             .long("offline")
             .help("Offline mode - the kad network is not started")
         )
         .arg(
-            clap::Arg::with_name("local-ip")
+            clap::Arg::new("local-ip")
             .long("local-ip")
             .help("Populate the local ip info (default None)")
             .value_name("IP")
             .required(false),
         )
         .arg(
-            clap::Arg::with_name("public-ip")
+            clap::Arg::new("public-ip")
             .long("public-ip")
             .help("Populate the public ip info (default None)")
             .value_name("IP")
@@ -395,6 +408,9 @@ pub fn create_app_config() -> Config {
     if let Some(value) = matches.value_of("p2p-bootstrap-addr") {
         config.p2p_bootstrap_addr = Some(value.to_owned());
     }
+    if let Some(value) = matches.value_of("p2p-keypair") {
+        config.p2p_keypair = Some(value.to_owned());
+    }
     if let Some(value) = matches.value_of("monitor-file") {
         config.monitor_file = value.to_owned();
     }
@@ -424,8 +440,7 @@ mod tests {
         fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
             write!(
                 f,
-                "validator = 'FIXME'\n\
-                log-level = '{}'\n\
+                "log-level = '{}'\n\
                 network = '{}'\n\
                 block-threshold = {}\n\
                 block-timeout = {}\n\
@@ -479,6 +494,7 @@ mod tests {
             offline: false,
             local_ip: None,
             public_ip: None,
+            p2p_keypair: None,
         }
     }
 

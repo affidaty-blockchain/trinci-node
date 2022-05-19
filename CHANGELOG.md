@@ -26,10 +26,18 @@ Additional labels for pre-release metadata:
 * beta.x: shipped version under testing.
 * rc.x: stable release candidate.
 
+
+0.2.7 - 24-05-2022
+----------------------
+* Call to Service `contract_updatable`
+* NFA Non-Fungible Account
+* Fixed Drand method
+* Monitor does not send data if offline mode is active
+
 0.2.7-rc1 - 16-02-2022
 ------------------
 Changed
-* BlockchainSettings struct
+* BlockchainSettings structure
 * `test-mode` flag renamed in `offline`
 
 0.2.6 - 08-02-2022
@@ -43,7 +51,7 @@ Changed
 
 Added
 * test mode to p2p module (prevent it from start)
-* ip address from commandline
+* ip address from command line
 
 Changed
 * new monitor architecture

@@ -17,6 +17,7 @@
 
 #[cfg(feature = "monitor")]
 use crate::monitor::{self, service::MonitorService, worker::MonitorConfig};
+use crate::utils;
 use crate::{config::Config, config::SERVICE_ACCOUNT_ID};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -24,7 +25,9 @@ use trinci_core::base::BlockchainSettings;
 use trinci_core::crypto::drand::SeedSource;
 use trinci_core::crypto::{Hash, HashAlgorithm};
 use trinci_core::db::DbFork;
-use trinci_core::{Account, VERSION};
+
+use trinci_core::{wm::MAX_FUEL, Account, Error, VERSION};
+
 use version_compare::Cmp;
 
 use trinci_core::{
@@ -60,6 +63,8 @@ pub struct App {
     pub p2p_public_key: Ed25519PublicKey,
     /// Bootstrap path
     pub bootstrap_path: String,
+    /// Seed
+    pub seed: Arc<SeedSource>,
 }
 
 // If this panics, it panics early at node boot. Not a big deal.
@@ -92,26 +97,42 @@ fn is_validator_function_temporary(value: bool) -> impl IsValidator {
 fn is_validator_function_call(
     wm: Arc<Mutex<dyn Wm>>,
     db: Arc<RwLock<dyn Db<DbForkType = RocksDbFork>>>,
+    seed: Arc<SeedSource>,
+    block_timestamp: u64,
 ) -> impl IsValidator {
     move |account_id: String| {
         let args = rmp_serialize(&account_id)?;
 
-        let mut db = db.write().fork_create();
-
+        let seed = seed.clone();
+        let mut fork = db.write().fork_create();
         let mut events = Vec::new();
 
-        let res = wm.lock().call(
-            &mut db,
+        let account = fork
+            .load_account(SERVICE_ACCOUNT_ID)
+            .ok_or_else(|| Error::new_ext(ErrorKind::Other, "The Service Account must exist!"))?;
+
+        let contract = account.contract.ok_or_else(|| {
+            Error::new_ext(
+                ErrorKind::Other,
+                "The Service Account must have a contract!",
+            )
+        })?;
+        let (_, res) = wm.lock().call(
+            &mut fork,
             42,
-            "",
-            "",
+            "skynet",
             SERVICE_ACCOUNT_ID,
-            "",
-            None,
+            SERVICE_ACCOUNT_ID,
+            SERVICE_ACCOUNT_ID,
+            contract,
             "is_validator",
             &args,
+            seed,
             &mut events,
-        )?;
+            MAX_FUEL,
+            block_timestamp,
+        );
+        let res = res?;
 
         rmp_deserialize(&res)
     }
@@ -138,7 +159,7 @@ fn bootstrap_monitor(chan: BlockRequestSender) {
                     panic!("Block constructed but 'service' account is not yet active");
                 }
             }
-            Ok(res) => warn!("Bootstrap unexpected message: {:?}", res),
+            Ok(res) => info!("Bootstrap subscribe response: {:?}", res),
             Err(err) => error!("Channel error: {}", err),
         }
     }
@@ -239,9 +260,20 @@ impl App {
         #[cfg(feature = "monitor")]
         let seed_value = seed.get_seed();
 
-        // Needed in p2p service and blockchain information gatering
-        let p2p_keypair = Ed25519KeyPair::from_random();
-        let p2p_public_key: Ed25519PublicKey = p2p_keypair.public_key();
+        // Needed in p2p service and blockchain information gathering
+        let (p2p_public_key, p2p_keypair) = if config.p2p_keypair.is_some() {
+            let p2p_keypair = utils::load_keypair(config.p2p_keypair).unwrap();
+            let p2p_keypair = match p2p_keypair {
+                KeyPair::Ecdsa(_) => panic!("P2P keypair should be ED25519"),
+                KeyPair::Ed25519(kp) => kp,
+            };
+            debug!("[p2p] keypair loaded from file");
+            (p2p_keypair.public_key(), p2p_keypair)
+        } else {
+            let p2p_keypair = Ed25519KeyPair::from_random();
+            debug!("[p2p] keypair randomly generated");
+            (p2p_keypair.public_key(), p2p_keypair)
+        };
 
         let block_svc = BlockService::new(
             &keypair.public_key().to_account_id(),
@@ -249,7 +281,7 @@ impl App {
             block_config,
             db,
             wm,
-            seed,
+            seed.clone(),
             p2p_public_key.to_account_id(),
         );
         let chan = block_svc.request_channel();
@@ -308,7 +340,7 @@ impl App {
                 data: node_status,
             };
 
-            MonitorService::new(monitor_config, chan)
+            MonitorService::new(monitor_config, chan, config.offline)
         };
 
         App {
@@ -321,6 +353,7 @@ impl App {
             keypair,
             #[cfg(feature = "monitor")]
             monitor_svc: Some(monitor_svc),
+            seed,
         }
     }
 
@@ -345,14 +378,7 @@ impl App {
         let buf = db.read().load_configuration("blockchain:settings").unwrap(); // If this fails is at the very beginning
         let config = rmp_deserialize::<BlockchainSettings>(&buf).unwrap(); // If this fails is at the very beginning
 
-        // update node execution modality
-        self.block_svc
-            .lock()
-            .wm_arc()
-            .lock()
-            .set_mode(config.is_production);
-
-        // check core verison
+        // Check core version
         let version = VERSION;
         match version_compare::compare(version, config.min_node_version.clone()) {
             Ok(Cmp::Lt) => {
@@ -423,7 +449,7 @@ impl App {
 
             let wm = self.block_svc.lock().wm_arc();
 
-            let is_validator = is_validator_function_call(wm, db);
+            let is_validator = is_validator_function_call(wm, db, self.seed.clone(), 0);
 
             self.set_block_service_is_validator(is_validator);
 
@@ -446,9 +472,9 @@ impl App {
             self.set_block_service_config(BlockchainSettings {
                 accept_broadcast: false,
                 block_threshold,
-                block_timeout: 2,
+                block_timeout: 2, // The genesis block will be executed after this timeout and not with block_threshold transactions in the pool // FIXME
                 burning_fuel_method: String::new(),
-                network_name: Some("bootstrap".to_string()), // The genesis block will be executed after this timeout and not with block_threshold transactions in the pool // FIXME
+                network_name: Some("bootstrap".to_string()),
                 is_production: true,
                 min_node_version: String::from("0.2.6"),
             });
@@ -459,6 +485,7 @@ impl App {
             if bootstrap_txs.is_empty() {
                 let wm = self.block_svc.lock().wm_arc();
                 let db = self.block_svc.lock().db_arc();
+                let seed = self.seed.clone();
 
                 std::thread::spawn(move || {
                     bootstrap_monitor(chan.clone());
@@ -484,7 +511,7 @@ impl App {
                     // Store the configuration on the DB
                     bs.store_config_into_db(config);
 
-                    let is_validator = is_validator_function_call(wm.clone(), db.clone());
+                    let is_validator = is_validator_function_call(wm.clone(), db.clone(), seed, 0);
                     bs.set_validator(is_validator);
 
                     bs.start();
@@ -509,7 +536,7 @@ impl App {
                 let wm = self.block_svc.lock().wm_arc();
                 let db = self.block_svc.lock().db_arc();
 
-                let is_validator = is_validator_function_call(wm, db);
+                let is_validator = is_validator_function_call(wm, db, self.seed.clone(), 0);
 
                 self.set_block_service_is_validator(is_validator);
 
@@ -579,7 +606,6 @@ impl App {
 mod tests {
     use crate::app::Bootstrap;
     use trinci_core::base::serialize::rmp_deserialize;
-    use trinci_core::crypto::ed25519::KeyPair as Ed25519KeyPair;
 
     #[ignore = "use this to check a boostrap file"]
     #[test]
@@ -594,14 +620,5 @@ mod tests {
         let bootstrap = bootstrap.unwrap();
         println!("{} Transactions", &bootstrap.txs.len());
         println!("nonce: `{}`", &bootstrap.nonce);
-    }
-
-    #[ignore = "use this to create a new ed25519 keypair"]
-    #[test]
-    fn create_ed25519_keypair() {
-        let ed25519_keypair = Ed25519KeyPair::from_random();
-        let bin = ed25519_keypair.to_bytes();
-        println! {"Account id: {}", ed25519_keypair.public_key().to_account_id()};
-        std::fs::write("keypair.bin", bin).unwrap();
     }
 }
