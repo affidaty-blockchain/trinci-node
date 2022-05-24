@@ -7,7 +7,6 @@ BS_PATH='./data/bootstrap.bin'
 BS_IP_ADDR='15.161.71.249' 
 BS_ADDR='@/ip4/15.161.71.249/tcp/9006'
 DB_PATH='./db/'
-BS_FILE="bootstrap.bin"
 
 # Output settings.
 STEP_CODE="\033[0;33m"
@@ -157,13 +156,13 @@ fi
 
 get_db_folder() {
     # Calculating DB path
-    if [ ! -f $BS_FILE ]; then
+    if [ ! -f $BS_PATH ]; then
         echo -e "${ERROR_CODE}Missing bootstrap file. \n${CLEAN_CODE}"
         exit 1
     fi
 
     echo -e "${SUCCESS_CODE}Calculating DB path...${CLEAN_CODE}"
-    bootstrap_hash=$(echo -n "1220"$(shasum -a 256 $BS_FILE | cut -f1 -d' ') | xxd -r -p | base58)
+    bootstrap_hash=$(echo -n "1220"$(shasum -a 256 $BS_PATH | cut -f1 -d' ') | xxd -r -p | base58)
     db_path="${DB_PATH}${bootstrap_hash}/"
     echo -e "${STEP_CODE}DB path: $db_path ${CLEAN_CODE}"
 }
