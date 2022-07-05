@@ -1,6 +1,6 @@
 [package]
 name = "trinci-node"
-version = "0.2.7"
+version = "0.2.8"
 authors = ["The Trinci Team <trinci@affidaty.io>"]
 edition = "2021"
 description = "TRINCI blockchain node"
@@ -12,7 +12,7 @@ trinci-core = { git = "https://github.com/affidaty-blockchain/trinci-core" }
 log = { version = "0.4.14", features = ["release_max_level_info"] }
 clap = { version = "3.1.0", features = ["cargo"] }
 toml = "0.5.8"
-simplelog = "0.11.1"
+simplelog = "0.12.0"
 hex = "0.4.3"
 serde-value = { git = "https://github.com/affidaty-blockchain/serde-value", branch = "helper_macro" }
 serde_bytes = "0.11.5"

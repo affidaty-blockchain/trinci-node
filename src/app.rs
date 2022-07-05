@@ -475,8 +475,7 @@ impl App {
                 block_timeout: 2, // The genesis block will be executed after this timeout and not with block_threshold transactions in the pool // FIXME
                 burning_fuel_method: String::new(),
                 network_name: Some("bootstrap".to_string()),
-                is_production: true,
-                min_node_version: String::from("0.2.6"),
+                min_node_version: String::from("0.2.7"),
             });
 
             let block_svc = self.block_svc.clone();
