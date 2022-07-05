@@ -36,7 +36,7 @@ deploy_nightly:
     only:
         - master
     script:
-        - cargo build +nightly --out-dir build -Z unstable-options
+        - cargo +nightly build --out-dir build -Z unstable-options
         - strip build/trinci-node
         - scp build/trinci-node runner@${DEPLOY_HOST}:trinci/nightly/trinci_new
 
@@ -47,7 +47,7 @@ deploy_staging:
     only:
         - tags
     script:
-        - cargo build +nightly --out-dir $(pwd)/build -Z unstable-options
+        - cargo +nightly build --out-dir $(pwd)/build -Z unstable-options
         - strip build/trinci-node
         - scp build/trinci-node runner@${DEPLOY_HOST}:trinci/staging/trinci_new
 
@@ -58,6 +58,6 @@ deploy_release:
     only:
         - tags
     script:
-        - cargo build +nightly --release --out-dir $(pwd)/build -Z unstable-options
+        - cargo +nightly build --release --out-dir $(pwd)/build -Z unstable-options
         - strip build/trinci-node
         - scp build/trinci-node runner@${DEPLOY_HOST}:trinci/release/trinci_new
