@@ -26,8 +26,16 @@ Additional labels for pre-release metadata:
 * beta.x: shipped version under testing.
 * rc.x: stable release candidate.
 
+0.2.8 05-07-2022
+----------------
+Changed
+* Bulk transaction is paid by the signer
 
-0.2.7-rc2 - unreleased
+Fixed
+* Block time fixed (before was always zero) ### Breaking Change
+
+
+0.2.7 - 24-05-2022
 ----------------------
 * Call to Service `contract_updatable`
 * NFA Non-Fungible Account
