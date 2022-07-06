@@ -3,9 +3,9 @@
 # Node vars.
 TARGET_PORT=8001
 HTTP_PORT=8000
-BS_PATH='./data/prod-bootstrap.bin'
-BS_IP_ADDR='15.160.179.75' 
-BS_ADDR='@/ip4/15.160.179.75/tcp/9001'
+BS_PATH='./data/testnet-bootstrap.bin'
+BS_IP_ADDR='15.161.71.249' 
+BS_ADDR='@/ip4/15.161.71.249/tcp/9006'
 DB_PATH='./db/'
 
 # Output settings.
@@ -92,7 +92,7 @@ negotiate_upnp_port() {
 get_bs_address() {
     # Retrieve BS addr ID
     echo -e "${SUCCESS_CODE}Retrieving P2P bootstrap ID... ${CLEAN_CODE}"
-    bs_id=`curl -s http://t27.trinci.net:8000/api/v1/p2p/id` 
+    bs_id=`curl -s http://testnet.trinci.net/api/v1/p2p/id` 
     bs_addr="${bs_id}${BS_ADDR}"
     echo -e "${STEP_CODE}Bootstrap address: $bs_addr\n ${CLEAN_CODE}"
 }
