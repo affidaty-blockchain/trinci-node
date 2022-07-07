@@ -376,6 +376,7 @@ impl App {
         let block_svc = self.block_svc.clone();
         let db = block_svc.lock().db_arc();
         let buf = db.read().load_configuration("blockchain:settings").unwrap(); // If this fails is at the very beginning
+
         let config = rmp_deserialize::<BlockchainSettings>(&buf).unwrap(); // If this fails is at the very beginning
 
         // Check core version
@@ -476,6 +477,7 @@ impl App {
                 burning_fuel_method: String::new(),
                 network_name: Some("bootstrap".to_string()),
                 min_node_version: String::from("0.2.7"),
+                is_production: true,
             });
 
             let block_svc = self.block_svc.clone();
