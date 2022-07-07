@@ -44,6 +44,7 @@ use trinci_core::{
     wm::{Wm, WmLocal},
     ErrorKind, Transaction,
 };
+
 /// Application context.
 pub struct App {
     /// Block service context.
@@ -343,6 +344,14 @@ impl App {
             MonitorService::new(monitor_config, chan, config.offline)
         };
 
+        // Collect data to initialize the file that contains informations about the node.
+        let node_info = NodeInfo {
+            bootstrap_path: config.bootstrap_path.clone(),
+        };
+
+        // Save info in file.
+        save_config_in_file(node_info);
+
         App {
             block_svc: Arc::new(Mutex::new(block_svc)),
             rest_svc,
@@ -601,6 +610,22 @@ impl App {
         }
         println!("Something bad happened, stopping the application");
     }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct NodeInfo {
+    bootstrap_path: String,
+}
+
+// Takes the ?tuple? and save it in a file
+fn save_config_in_file(node_info: NodeInfo) {
+    // TODO: hanlde errors
+    // Save the JSON structure into the output file
+    std::fs::write(
+        "node_info.info",
+        serde_json::to_string_pretty(&node_info).unwrap(),
+    )
+    .unwrap();
 }
 
 #[cfg(test)]
