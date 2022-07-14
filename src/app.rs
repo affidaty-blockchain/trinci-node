@@ -106,6 +106,8 @@ fn is_validator_function_call(
         let seed = seed.clone();
         let mut fork = db.write().fork_create();
         let mut events = Vec::new();
+        #[cfg(feature = "indexer")]
+        let mut store_asset_db = Vec::new();
 
         let account = fork
             .load_account(SERVICE_ACCOUNT_ID)
@@ -129,6 +131,8 @@ fn is_validator_function_call(
             &args,
             seed,
             &mut events,
+            #[cfg(feature = "indexer")]
+            &mut store_asset_db,
             MAX_FUEL,
             block_timestamp,
         );
