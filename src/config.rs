@@ -21,6 +21,8 @@
 
 use std::{fs, path::Path};
 use toml::Value;
+#[cfg(feature = "indexer")]
+use trinci_core::blockchain::indexer::IndexerConfig;
 
 /// Default service account.
 pub const SERVICE_ACCOUNT_ID: &str = "TRINCI";
@@ -119,6 +121,9 @@ pub struct Config {
     pub local_ip: Option<String>,
     /// IP seen from the extern.
     pub public_ip: Option<String>,
+    /// Indexer Configuration
+    #[cfg(feature = "indexer")]
+    pub indexer_config: IndexerConfig,
 }
 
 impl Default for Config {
@@ -145,6 +150,8 @@ impl Default for Config {
             offline: false,
             local_ip: None,
             public_ip: None,
+            #[cfg(feature = "indexer")]
+            indexer_config: IndexerConfig::default(),
         }
     }
 }
@@ -231,6 +238,18 @@ impl Config {
         }
         if let Some(value) = map.get("public-ip").and_then(|value| value.as_str()) {
             config.public_ip = Some(value.to_owned());
+        }
+        if let Some(value) = map.get("indexer-host").and_then(|value| value.as_str()) {
+            config.indexer_config.host = value.to_owned();
+        }
+        if let Some(value) = map.get("indexer-port").and_then(|value| value.as_integer()) {
+            config.indexer_config.port = value as u16;
+        }
+        if let Some(value) = map.get("indexer-username").and_then(|value| value.as_str()) {
+            config.indexer_config.user = value.to_owned();
+        }
+        if let Some(value) = map.get("indexer-password").and_then(|value| value.as_str()) {
+            config.indexer_config.password = value.to_owned();
         }
         Some(config)
     }
@@ -495,6 +514,8 @@ mod tests {
             local_ip: None,
             public_ip: None,
             p2p_keypair: None,
+            #[cfg(feature = "indexer")]
+            indexer_config: IndexerConfig::default(),
         }
     }
 

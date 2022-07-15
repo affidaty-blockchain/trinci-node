@@ -95,6 +95,7 @@ fn main() {
     let config = config::create_app_config();
     logger_level(&config.log_level);
 
+
     info!("Starting TRINCI Node");
     info!("  Node version:         {}", env!("CARGO_PKG_VERSION"));
     info!("  Core version:         {}", trinci_core::VERSION);

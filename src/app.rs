@@ -105,9 +105,6 @@ fn is_validator_function_call(
 
         let seed = seed.clone();
         let mut fork = db.write().fork_create();
-        let mut events = Vec::new();
-        #[cfg(feature = "indexer")]
-        let mut store_asset_db = Vec::new();
 
         let account = fork
             .load_account(SERVICE_ACCOUNT_ID)
@@ -119,6 +116,7 @@ fn is_validator_function_call(
                 "The Service Account must have a contract!",
             )
         })?;
+
         let (_, res) = wm.lock().call(
             &mut fork,
             42,
@@ -130,9 +128,9 @@ fn is_validator_function_call(
             "is_validator",
             &args,
             seed,
-            &mut events,
+            &mut Vec::new(),
             #[cfg(feature = "indexer")]
-            &mut store_asset_db,
+            &mut Vec::new(),
             MAX_FUEL,
             block_timestamp,
         );
@@ -287,6 +285,8 @@ impl App {
             wm,
             seed.clone(),
             p2p_public_key.to_account_id(),
+            #[cfg(feature = "indexer")]
+            config.indexer_config,
         );
         let chan = block_svc.request_channel();
 
