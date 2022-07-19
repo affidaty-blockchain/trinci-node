@@ -247,6 +247,9 @@ impl Config {
             if let Some(value) = map.get("indexer-port").and_then(|value| value.as_integer()) {
                 config.indexer_config.port = value as u16;
             }
+            if let Some(value) = map.get("indexer-db-name").and_then(|value| value.as_str()) {
+                config.indexer_config.db_name = value.to_owned();
+            }
             if let Some(value) = map.get("indexer-username").and_then(|value| value.as_str()) {
                 config.indexer_config.user = value.to_owned();
             }
