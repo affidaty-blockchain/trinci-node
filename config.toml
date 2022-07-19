@@ -16,7 +16,7 @@ log-level = "debug"
 
 # Node bootstrap file in WASM format.
 # Default: "bootstrap.bin"
-bootstrap-path = "./data/bootstrap.bin"
+bootstrap-path = "./data/offline-bootstrap.bin"
 
 # Http service address.
 # Default: 127.0.0.1
@@ -69,6 +69,10 @@ indexer-host = "localhost"
 # couchdb Port
 # Default: 5984
 indexer-port = 5984
+
+# couchdb db name
+# Default: trinci
+indexer-db-name = "trinci"
 
 # couchdb user
 # Default: admin
