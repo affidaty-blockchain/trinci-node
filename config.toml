@@ -59,3 +59,21 @@ wm-cache-max = 10
 # Offline mode- prevent kad from start
 # Default: false
 #offline = true
+
+## Indexer configuration
+
+# couchdb Host
+# Default: "localhost"
+indexer-host = "localhost"
+
+# couchdb Port
+# Default: 5984
+indexer-port = 5984
+
+# couchdb user
+# Default: admin
+indexer-username = "admin"
+
+# couchdb password
+# Default: password
+indexer-password = "password"
