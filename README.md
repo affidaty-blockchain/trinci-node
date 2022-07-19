@@ -144,3 +144,17 @@ This file is a binary that is a [MessagePack](https://msgpack.org/) of a specifi
 
  - The first transaction of the `txs` vector needs to be the service account `init` call (this will register the service account).
  - The initial network name for the genesis block is `bootstrap`, then the network name will be the base58 of the `bootstrap.bin` file hash. So each different `bootstrap.bin` creates a different network.
+
+### Features
+
+### `default`
+
+## `rt-monitor`
+// TODO
+
+## `monitor`
+// TODO
+
+## `indexer`
+Enabling this feature allows to populate a k,v database (`couchdb`) 
+with data about the account asset movements
