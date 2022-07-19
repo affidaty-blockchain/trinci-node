@@ -88,6 +88,30 @@ fn show_config(config: &Config) {
     if config.offline {
         info!("  Offline mode:  Active");
     }
+
+    // Feature enabled
+
+    info!("Features:");
+    let mut active_feature = false;
+    if cfg!(feature = "tpm2") {
+        info!("  tmp2:  Active");
+        active_feature = true;
+    }
+    if cfg!(feature = "monitor") {
+        info!("  monitor:  Active");
+        active_feature = true;
+    }
+    if cfg!(feature = "rt-monitor") {
+        info!("  rt-monitor:  Active");
+        active_feature = true;
+    }
+    if cfg!(feature = "indexer") {
+        info!("  indexer:  Active");
+        active_feature = true;
+    }
+    if !active_feature {
+        info!("  None");
+    }
 }
 
 fn main() {
