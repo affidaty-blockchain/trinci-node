@@ -26,7 +26,7 @@ Additional labels for pre-release metadata:
 * beta.x: shipped version under testing.
 * rc.x: stable release candidate.
 
-0.2.9 unreleased
+0.2.9-rc1 28-07-2022
 ----------------
 Added
  * Indexer feature
