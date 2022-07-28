@@ -30,6 +30,7 @@ Additional labels for pre-release metadata:
 ----------------
 Added
  * Indexer feature
+ * Now node can be contacted via rest to recover bootstrap and network informations.
 
 0.2.8 05-07-2022
 ----------------

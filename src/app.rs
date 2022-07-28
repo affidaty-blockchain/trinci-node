@@ -25,6 +25,7 @@ use trinci_core::base::BlockchainSettings;
 use trinci_core::crypto::drand::SeedSource;
 use trinci_core::crypto::{Hash, HashAlgorithm};
 use trinci_core::db::DbFork;
+use trinci_core::rest::service::NodeInfo;
 
 use trinci_core::{wm::MAX_FUEL, Account, Error, VERSION};
 
@@ -44,6 +45,7 @@ use trinci_core::{
     wm::{Wm, WmLocal},
     ErrorKind, Transaction,
 };
+
 /// Application context.
 pub struct App {
     /// Block service context.
@@ -290,12 +292,6 @@ impl App {
         );
         let chan = block_svc.request_channel();
 
-        let rest_config = RestConfig {
-            addr: config.rest_addr.clone(),
-            port: config.rest_port,
-        };
-        let rest_svc = RestService::new(rest_config, chan.clone());
-
         let p2p_config = PeerConfig {
             addr: config.p2p_addr.clone(),
             port: config.p2p_port,
@@ -322,7 +318,7 @@ impl App {
                 nw_public_key,
                 role: monitor::worker::NodeRole::Ordinary, // FIXME
                 nw_config: monitor::worker::NetworkConfig {
-                    name: config.network,
+                    name: config.network.clone(),
                     block_threshold: config.block_threshold,
                     block_timeout: config.block_timeout,
                 },
@@ -332,10 +328,10 @@ impl App {
                 p2p_info: monitor::worker::P2pInfo {
                     p2p_addr: config.p2p_addr,
                     p2p_port: config.p2p_port,
-                    p2p_bootstrap_addr: config.p2p_bootstrap_addr,
+                    p2p_bootstrap_addr: config.p2p_bootstrap_addr.clone(),
                 },
                 ip_endpoint: config.local_ip,
-                pub_ip: config.public_ip,
+                pub_ip: config.public_ip.clone(),
                 seed: seed_value,
             };
 
@@ -344,8 +340,36 @@ impl App {
                 data: node_status,
             };
 
-            MonitorService::new(monitor_config, chan, config.offline)
+            MonitorService::new(monitor_config, chan.clone(), config.offline)
         };
+
+        // Collect data to initialize the file that contains informations about the node.
+        let public_ip = if config.public_ip.is_some() {
+            config.public_ip.unwrap()
+        } else {
+            String::from(" ")
+        };
+
+        let bootstrap_address = if config.p2p_bootstrap_addr.is_some() {
+            config.p2p_bootstrap_addr.unwrap()
+        } else {
+            String::from(" ")
+        };
+
+        let node_info = NodeInfo {
+            bootstrap_path: config.bootstrap_path.clone(),
+            public_ip: public_ip.clone(),
+            bootstrap_address,
+            bootstrap_url_access: format!("{}:{}/api/v1/bootstrap", public_ip, config.rest_port),
+            bootstrap_hash: config.network,
+        };
+
+        let rest_config = RestConfig {
+            addr: config.rest_addr.clone(),
+            port: config.rest_port,
+            node_info,
+        };
+        let rest_svc = RestService::new(rest_config, chan);
 
         App {
             block_svc: Arc::new(Mutex::new(block_svc)),
