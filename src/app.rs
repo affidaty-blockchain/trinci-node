@@ -20,12 +20,12 @@ use crate::monitor::{self, service::MonitorService, worker::MonitorConfig};
 use crate::utils;
 use crate::{config::Config, config::SERVICE_ACCOUNT_ID};
 use serde::{Deserialize, Serialize};
-use std::fmt::format;
 use std::sync::Arc;
 use trinci_core::base::BlockchainSettings;
 use trinci_core::crypto::drand::SeedSource;
 use trinci_core::crypto::{Hash, HashAlgorithm};
 use trinci_core::db::DbFork;
+use trinci_core::rest::service::NodeInfo;
 
 use trinci_core::{wm::MAX_FUEL, Account, Error, VERSION};
 
@@ -288,12 +288,6 @@ impl App {
         );
         let chan = block_svc.request_channel();
 
-        let rest_config = RestConfig {
-            addr: config.rest_addr.clone(),
-            port: config.rest_port.clone(),
-        };
-        let rest_svc = RestService::new(rest_config, chan.clone());
-
         let p2p_config = PeerConfig {
             addr: config.p2p_addr.clone(),
             port: config.p2p_port,
@@ -342,7 +336,7 @@ impl App {
                 data: node_status,
             };
 
-            MonitorService::new(monitor_config, chan, config.offline)
+            MonitorService::new(monitor_config, chan.clone(), config.offline)
         };
 
         // Collect data to initialize the file that contains informations about the node.
@@ -361,13 +355,17 @@ impl App {
         let node_info = NodeInfo {
             bootstrap_path: config.bootstrap_path.clone(),
             public_ip: public_ip.clone(),
-            //address: todo!(),
             bootstrap_address,
             bootstrap_url_access: format!("{}:{}/api/v1/bootstrap", public_ip, config.rest_port),
             bootstrap_hash: config.network,
         };
-        // Save info in file.
-        save_config_in_file(node_info);
+
+        let rest_config = RestConfig {
+            addr: config.rest_addr.clone(),
+            port: config.rest_port,
+            node_info,
+        };
+        let rest_svc = RestService::new(rest_config, chan);
 
         App {
             block_svc: Arc::new(Mutex::new(block_svc)),
@@ -627,27 +625,6 @@ impl App {
         }
         println!("Something bad happened, stopping the application");
     }
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-struct NodeInfo {
-    public_ip: String,
-    //address: String,
-    bootstrap_address: String,
-    bootstrap_url_access: String,
-    bootstrap_hash: String,
-    bootstrap_path: String,
-}
-
-// Takes the ?tuple? and save it in a file
-fn save_config_in_file(node_info: NodeInfo) {
-    // TODO: hanlde errors
-    // Save the JSON structure into the output file
-    std::fs::write(
-        "node_info.info",
-        serde_json::to_string_pretty(&node_info).unwrap(),
-    )
-    .unwrap();
 }
 
 #[cfg(test)]
