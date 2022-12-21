@@ -4,8 +4,8 @@
 TARGET_PORT=8001
 HTTP_PORT=8000
 BS_PATH='./data/prod-bootstrap.bin'
-BS_IP_ADDR='15.160.179.75' 
-BS_ADDR='@/ip4/15.160.179.75/tcp/9001'
+BS_IP_ADDR='15.160.119.12' 
+BS_ADDR='@/ip4/15.160.119.12/tcp/9001'
 DB_PATH='./db/'
 
 # Output settings.
