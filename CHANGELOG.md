@@ -29,8 +29,9 @@ Additional labels for pre-release metadata:
 0.2.9 unreleased
 ----------------
 Added
- * Indexer feature
- * Now node can be contacted via rest to recover bootstrap and network informations.
+ * readonly-exec feature
+Fixed
+ * drand
 
 0.2.8 05-07-2022
 ----------------
