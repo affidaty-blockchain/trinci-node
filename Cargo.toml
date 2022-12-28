@@ -1,6 +1,6 @@
 [package]
 name = "trinci-node"
-version = "0.2.9-rc1"
+version = "0.2.9"
 authors = ["The Trinci Team <trinci@affidaty.io>"]
 edition = "2021"
 description = "TRINCI blockchain node"
@@ -39,3 +39,4 @@ tpm2 = ["trinci-core/tpm2"]
 monitor = ["serde_json", "isahc", "ascii_table"]
 rt-monitor = ["trinci-core/rt-monitor"]
 indexer = ["trinci-core/indexer"]
+ro-exec = ["trinci-core/ro-exec"]

@@ -23,7 +23,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use trinci_core::base::BlockchainSettings;
 use trinci_core::crypto::drand::SeedSource;
-use trinci_core::crypto::{Hash, HashAlgorithm};
+use trinci_core::crypto::{Hash, HashAlgorithm, Hashable};
 use trinci_core::db::DbFork;
 use trinci_core::rest::service::NodeInfo;
 
@@ -247,18 +247,32 @@ impl App {
 
         let is_validator = is_validator_function_temporary(true);
 
+        // Update seed infos.
+        let (prev_hash, txs_hash, rxs_hash) = match db.load_block(u64::MAX) {
+            Some(block) => (
+                block.data.primary_hash(),
+                block.data.txs_hash,
+                block.data.rxs_hash,
+            ),
+            None => (
+                Hash::from_hex(
+                    "1220d4ff2e94b9ba93c2bd4f5e383eeb5c5022fd4a223285629cfe2c86ed4886f730",
+                )
+                .unwrap(),
+                Hash::from_hex(
+                    "1220d4ff2e94b9ba93c2bd4f5e383eeb5c5022fd4a223285629cfe2c86ed4886f730",
+                )
+                .unwrap(),
+                Hash::from_hex(
+                    "1220d4ff2e94b9ba93c2bd4f5e383eeb5c5022fd4a223285629cfe2c86ed4886f730",
+                )
+                .unwrap(),
+            ),
+        };
+
         // seed initialization
         let nonce: Vec<u8> = vec![0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
 
-        let prev_hash =
-            Hash::from_hex("1220d4ff2e94b9ba93c2bd4f5e383eeb5c5022fd4a223285629cfe2c86ed4886f730")
-                .unwrap();
-        let txs_hash =
-            Hash::from_hex("1220d4ff2e94b9ba93c2bd4f5e383eeb5c5022fd4a223285629cfe2c86ed4886f730")
-                .unwrap();
-        let rxs_hash =
-            Hash::from_hex("1220d4ff2e94b9ba93c2bd4f5e383eeb5c5022fd4a223285629cfe2c86ed4886f730")
-                .unwrap();
         let seed = SeedSource::new(config.network.clone(), nonce, prev_hash, txs_hash, rxs_hash);
         let seed = Arc::new(seed);
         #[cfg(feature = "monitor")]
