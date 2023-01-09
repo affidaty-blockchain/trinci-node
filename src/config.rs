@@ -36,6 +36,9 @@ pub const DEFAULT_LOG_LEVEL: &str = "info";
 /// Default bootstrap file path.
 pub const DEFAULT_BOOTSTRAP_PATH: &str = "bootstrap.bin";
 
+/// Default bootstrap replicant file path.
+pub const DEFAULT_BOOTSTRAP_REPLICANT_PATH: &str = "data/replicant_bootstrap.bin";
+
 /// Default network identifier.
 pub const DEFAULT_NETWORK_ID: &str = "bootstrap";
 
@@ -124,6 +127,8 @@ pub struct Config {
     /// Indexer Configuration
     #[cfg(feature = "indexer")]
     pub indexer_config: IndexerConfig,
+    /// Bootstrap node for autoreplicant procedure.
+    pub bootstrap_node_address: Option<String>,
 }
 
 impl Default for Config {
@@ -152,6 +157,7 @@ impl Default for Config {
             public_ip: None,
             #[cfg(feature = "indexer")]
             indexer_config: IndexerConfig::default(),
+            bootstrap_node_address: None,
         }
     }
 }
@@ -388,6 +394,13 @@ pub fn create_app_config() -> Config {
             .value_name("IP")
             .required(false),
         )
+        .arg(
+            clap::Arg::new("autorepl")// TODO: use another flag
+            .long("autoreplicant-procedure")
+            .help("If used, the node tries to autoreplicate the bootstrap node passed as argument (default None)")
+            .value_name("IP/ADDRESS")
+            .required(false),
+        )
         .get_matches();
 
     let config_file = matches.value_of("config").unwrap_or(DEFAULT_CONFIG_FILE);
@@ -447,6 +460,9 @@ pub fn create_app_config() -> Config {
     }
     if let Some(value) = matches.value_of("local-ip") {
         config.local_ip = Some(value.to_owned());
+    }
+    if let Some(value) = matches.value_of("autorepl") {
+        config.bootstrap_node_address = Some(value.to_owned());
     }
     if matches.is_present("offline") {
         config.offline = true;
@@ -522,6 +538,7 @@ mod tests {
             p2p_keypair: None,
             #[cfg(feature = "indexer")]
             indexer_config: IndexerConfig::default(),
+            bootstrap_node_address: None,
         }
     }
 
