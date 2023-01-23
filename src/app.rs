@@ -15,6 +15,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with TRINCI. If not, see <https://www.gnu.org/licenses/>.
 
+use crate::config::DEFAULT_BOOTSTRAP_REPLICANT_PATH;
 #[cfg(feature = "monitor")]
 use crate::monitor::{self, service::MonitorService, worker::MonitorConfig};
 use crate::utils;
@@ -182,6 +183,7 @@ fn calculate_network_name(data: &[u8]) -> String {
 
 // Load the bootstrap struct from file, panic if something goes wrong
 fn load_bootstrap_struct_from_file(path: &str) -> (String, Vec<u8>, Vec<Transaction>) {
+    println!("path: {}", path);
     let mut bootstrap_file = std::fs::File::open(path).expect("bootstrap file not found");
 
     let mut buf = Vec::new();
@@ -232,9 +234,53 @@ pub(crate) fn load_config_from_service(chan: &BlockRequestSender) -> BlockchainS
 
 impl App {
     /// Create a new Application instance.
-    pub fn new(config: Config, keypair: KeyPair) -> Self {
+    pub fn new(mut config: Config, keypair: KeyPair) -> Self {
         let wm = WmLocal::new(config.wm_cache_max);
         let db = RocksDb::new(&config.db_path);
+
+        // In case the autoreplicant setting is enbled,
+        // recover the needed info from the bootstrap node.
+        match (db.load_block(u64::MAX), config.bootstrap_node_address) {
+            (None, Some(bootstrap_node_address)) => {
+                // Collect bootstrap infos.
+                let visa = utils::get_visa(&bootstrap_node_address).unwrap();
+                config.p2p_bootstrap_addr = Some(format!(
+                    "{}@/ip4/{}/tcp/{}",
+                    visa.p2p_account_id, visa.public_ip, visa.p2p_port
+                ));
+
+                // Retrieve bootstrap transactions.
+                utils::get_bootstrap(&bootstrap_node_address, &DEFAULT_BOOTSTRAP_REPLICANT_PATH);
+                config.bootstrap_path = DEFAULT_BOOTSTRAP_REPLICANT_PATH.to_owned();
+
+                // Check if local version is coherent to the remote version.
+                utils::check_version(
+                    (
+                        env!("CARGO_PKG_VERSION").to_string(),
+                        trinci_core::VERSION.to_string(),
+                    ),
+                    visa.node_version,
+                )
+            }
+            (Some(_), Some(bootstrap_node_address)) => {
+                // Collect bootstrap infos.
+                let visa = utils::get_visa(&bootstrap_node_address).unwrap();
+                config.p2p_bootstrap_addr = Some(format!(
+                    "{}@/ip4/{}/tcp/{}",
+                    visa.p2p_account_id, visa.public_ip, visa.p2p_port
+                ));
+
+                // Check if local version is coherent to the remote version.
+                utils::check_version(
+                    (
+                        env!("CARGO_PKG_VERSION").to_string(),
+                        trinci_core::VERSION.to_string(),
+                    ),
+                    visa.node_version,
+                )
+            }
+            (_, ..) => (),
+        }
 
         let keypair = Arc::new(keypair);
 
@@ -308,7 +354,7 @@ impl App {
 
         let p2p_config = PeerConfig {
             addr: config.p2p_addr.clone(),
-            port: config.p2p_port,
+            port: config.p2p_port.clone(),
             network: Mutex::new(config.network.clone()),
             bootstrap_addr: config.p2p_bootstrap_addr.clone(),
             p2p_keypair: Some(p2p_keypair),
@@ -364,18 +410,16 @@ impl App {
             String::from(" ")
         };
 
-        let bootstrap_address = if config.p2p_bootstrap_addr.is_some() {
-            config.p2p_bootstrap_addr.unwrap()
-        } else {
-            String::from(" ")
-        };
-
         let node_info = NodeInfo {
-            bootstrap_path: config.bootstrap_path.clone(),
             public_ip: public_ip.clone(),
-            bootstrap_address,
+            p2p_account_id: p2p_public_key.to_account_id(),
+            p2p_port: config.p2p_port,
             bootstrap_url_access: format!("{}:{}/api/v1/bootstrap", public_ip, config.rest_port),
-            bootstrap_hash: config.network,
+            bootstrap_file_path: config.bootstrap_path.clone(),
+            node_version: (
+                env!("CARGO_PKG_VERSION").to_string(),
+                trinci_core::VERSION.to_string(),
+            ),
         };
 
         let rest_config = RestConfig {
