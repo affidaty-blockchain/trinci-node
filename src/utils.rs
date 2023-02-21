@@ -26,6 +26,8 @@ use trinci_core::{
     Error, ErrorKind, Result,
 };
 
+use ring::digest;
+
 /// Load node account keypair.
 pub fn load_keypair(filename: Option<String>) -> Result<KeyPair> {
     match filename {
@@ -75,14 +77,32 @@ pub fn get_visa(node_address: &str) -> Result<NodeInfo> {
 }
 
 /// Collects bootstrap file.
-pub fn get_bootstrap(node_address: &str, bootstrap_path: &str) {
+pub fn get_bootstrap(node_address: &str, bootstrap_path: String) -> String {
     match isahc::get(format!("{}/api/v1/bootstrap", node_address)) {
         Ok(mut response) => {
             println!("bootstrap retrieved");
-            let mut file = File::create(bootstrap_path).unwrap();
-            file.write(&response.bytes().unwrap()).unwrap();
+
+            let bootstrap_bytes = response.bytes().unwrap();
+
+            let mut hash = digest::digest(&digest::SHA256, &bootstrap_bytes)
+                .as_ref()
+                .to_vec();
+
+            let mut pre_hash: Vec<u8> = [0x12, 0x20].to_vec();
+            pre_hash.append(&mut hash);
+
+            let bs58 = bs58::encode(pre_hash);
+            let bootstrap_hash = bs58.into_string();
+            let bootstrap_path = format!("data/{}.bin", bootstrap_hash);
+
+            let mut file = File::create(&bootstrap_path).unwrap();
+            file.write(&bootstrap_bytes).unwrap();
+            bootstrap_hash
         }
-        Err(error) => println!("Error occourred during get request: {}", error.to_string()),
+        Err(error) => {
+            println!("Error occourred during get request: {}", error.to_string());
+            bootstrap_path
+        }
     }
 }
 

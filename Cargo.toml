@@ -30,6 +30,9 @@ isahc = { version = "1.6.0", features = ["json"], optional = true }
 ascii_table = { version = "4.0.2", optional = true }
 # versioning comparer
 version-compare = "0.1.0"
+# autoreplicant feature dependencies
+ring = { version = "0.16.20", default-features = false, features = ["std"] }
+
 
 [dev-dependencies]
 glob = "0.3.0"

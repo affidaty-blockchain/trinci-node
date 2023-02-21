@@ -236,12 +236,11 @@ impl App {
     /// Create a new Application instance.
     pub fn new(mut config: Config, keypair: KeyPair) -> Self {
         let wm = WmLocal::new(config.wm_cache_max);
-        let db = RocksDb::new(&config.db_path);
 
         // In case the autoreplicant setting is enbled,
         // recover the needed info from the bootstrap node.
-        match (db.load_block(u64::MAX), config.bootstrap_node_address) {
-            (None, Some(bootstrap_node_address)) => {
+        match config.bootstrap_node_address {
+            Some(bootstrap_node_address) => {
                 // Collect bootstrap infos.
                 let visa = utils::get_visa(&bootstrap_node_address).unwrap();
                 config.p2p_bootstrap_addr = Some(format!(
@@ -250,8 +249,12 @@ impl App {
                 ));
 
                 // Retrieve bootstrap transactions.
-                utils::get_bootstrap(&bootstrap_node_address, &DEFAULT_BOOTSTRAP_REPLICANT_PATH);
-                config.bootstrap_path = DEFAULT_BOOTSTRAP_REPLICANT_PATH.to_owned();
+                let bootstrap_path = DEFAULT_BOOTSTRAP_REPLICANT_PATH;
+                let bootstrap_hash =
+                    utils::get_bootstrap(&bootstrap_node_address, bootstrap_path.to_owned());
+
+                config.bootstrap_path = format!("data/{}.bin", &bootstrap_hash);
+                config.db_path = bootstrap_hash;
 
                 // Check if local version is coherent to the remote version.
                 utils::check_version(
@@ -260,27 +263,14 @@ impl App {
                         trinci_core::VERSION.to_string(),
                     ),
                     visa.node_version,
-                )
+                );
             }
-            (Some(_), Some(bootstrap_node_address)) => {
-                // Collect bootstrap infos.
-                let visa = utils::get_visa(&bootstrap_node_address).unwrap();
-                config.p2p_bootstrap_addr = Some(format!(
-                    "{}@/ip4/{}/tcp/{}",
-                    visa.p2p_account_id, visa.public_ip, visa.p2p_port
-                ));
-
-                // Check if local version is coherent to the remote version.
-                utils::check_version(
-                    (
-                        env!("CARGO_PKG_VERSION").to_string(),
-                        trinci_core::VERSION.to_string(),
-                    ),
-                    visa.node_version,
-                )
-            }
-            (_, ..) => (),
+            _ => (),
         }
+
+        // If in replication mode, path specified by nw name,
+        // otherwise the config file path will be used.
+        let db = RocksDb::new(&config.db_path);
 
         let keypair = Arc::new(keypair);
 

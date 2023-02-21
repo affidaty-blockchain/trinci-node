@@ -37,7 +37,7 @@ pub const DEFAULT_LOG_LEVEL: &str = "info";
 pub const DEFAULT_BOOTSTRAP_PATH: &str = "bootstrap.bin";
 
 /// Default bootstrap replicant file path.
-pub const DEFAULT_BOOTSTRAP_REPLICANT_PATH: &str = "data/replicant_bootstrap.bin";
+pub const DEFAULT_BOOTSTRAP_REPLICANT_PATH: &str = "replicant";
 
 /// Default network identifier.
 pub const DEFAULT_NETWORK_ID: &str = "bootstrap";
