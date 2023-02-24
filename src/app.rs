@@ -41,10 +41,12 @@ use trinci_core::{
     bridge::{BridgeConfig, BridgeService},
     crypto::{ed25519::KeyPair as Ed25519KeyPair, ed25519::PublicKey as Ed25519PublicKey, KeyPair},
     db::{Db, RocksDb, RocksDbFork},
+    kafka::{KafkaConfig, KafkaService}, // TODO: make it feature enabled
     p2p::{service::PeerConfig, PeerService},
     rest::{RestConfig, RestService},
     wm::{Wm, WmLocal},
-    ErrorKind, Transaction,
+    ErrorKind,
+    Transaction,
 };
 
 /// Application context.
@@ -60,6 +62,8 @@ pub struct App {
     /// Monitor service context.
     #[cfg(feature = "monitor")]
     pub monitor_svc: Option<MonitorService>,
+    /// Kafka service TODO: make it optional
+    pub kafka_svc: KafkaService,
     /// Keypair placeholder.
     pub keypair: Arc<KeyPair>,
     /// p2p Keypair placeholder
@@ -417,7 +421,13 @@ impl App {
             port: config.rest_port,
             node_info,
         };
-        let rest_svc = RestService::new(rest_config, chan);
+        let rest_svc = RestService::new(rest_config, chan.clone());
+
+        let kafka_config = KafkaConfig {
+            addr: "TODO".to_string(),
+            port: 0,
+        };
+        let kafka_service = KafkaService::new(kafka_config, chan);
 
         App {
             block_svc: Arc::new(Mutex::new(block_svc)),
@@ -430,6 +440,7 @@ impl App {
             #[cfg(feature = "monitor")]
             monitor_svc: Some(monitor_svc),
             seed,
+            kafka_svc: kafka_service,
         }
     }
 
@@ -635,6 +646,11 @@ impl App {
             let addr: String = _addr.unwrap();
             let file: String = _file.unwrap();
             self.monitor_svc.as_mut().unwrap().start(addr, file);
+        }
+
+        // TODO: make it feature
+        {
+            self.kafka_svc.start();
         }
     }
 
