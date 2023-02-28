@@ -424,8 +424,8 @@ impl App {
         let rest_svc = RestService::new(rest_config, chan.clone());
 
         let kafka_config = KafkaConfig {
-            addr: "TODO".to_string(),
-            port: 0,
+            addr: config.kafka_config.addr,
+            port: config.kafka_config.port,
         };
         let kafka_service = KafkaService::new(kafka_config, chan);
 
