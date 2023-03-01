@@ -23,6 +23,7 @@ use std::{fs, path::Path};
 use toml::Value;
 #[cfg(feature = "indexer")]
 use trinci_core::blockchain::indexer::IndexerConfig;
+#[cfg(feature = "kafka")]
 use trinci_core::kafka::KafkaConfig;
 
 /// Default service account.
@@ -130,6 +131,7 @@ pub struct Config {
     pub indexer_config: IndexerConfig,
     /// Bootstrap node for autoreplicant procedure.
     pub bootstrap_node_address: Option<String>,
+    #[cfg(feature = "kafka")]
     pub kafka_config: KafkaConfig,
 }
 
@@ -160,6 +162,7 @@ impl Default for Config {
             #[cfg(feature = "indexer")]
             indexer_config: IndexerConfig::default(),
             bootstrap_node_address: None,
+            #[cfg(feature = "kafka")]
             kafka_config: KafkaConfig {
                 addr: "127.0.0.1".to_string(),
                 port: 9777,
@@ -269,6 +272,7 @@ impl Config {
                 config.indexer_config.password = value.to_owned();
             }
         }
+        #[cfg(feature = "kafka")]
         if let Some(value) = map.get("kafka-addr").and_then(|value| value.as_str()) {
             config.kafka_config.addr = value.to_owned();
             if let Some(value) = map.get("kafka-addr").and_then(|value| value.as_integer()) {
@@ -417,14 +421,14 @@ pub fn create_app_config() -> Config {
             .required(false),
         )
         .arg(
-            clap::Arg::new("kafka-addr")// TODO: use another flag
+            clap::Arg::new("kafka-addr")
             .long("kafka-addr")
             .help("Setup kafka address")
             .value_name("IP/ADDRESS")
             .required(false),
         )
         .arg(
-            clap::Arg::new("kafka-port")// TODO: use another flag
+            clap::Arg::new("kafka-port")
             .long("kafka-port")
             .help("Setup kafka port")
             .value_name("PORT")
@@ -496,9 +500,11 @@ pub fn create_app_config() -> Config {
     if matches.is_present("offline") {
         config.offline = true;
     }
+    #[cfg(feature = "kafka")]
     if let Some(value) = matches.value_of("kafka-addr") {
         config.kafka_config.addr = value.to_owned();
     }
+    #[cfg(feature = "kafka")]
     if let Some(value) = matches
         .value_of("kafka-port")
         .and_then(|value| value.parse::<u16>().ok())
@@ -577,6 +583,7 @@ mod tests {
             #[cfg(feature = "indexer")]
             indexer_config: IndexerConfig::default(),
             bootstrap_node_address: None,
+            #[cfg(feature = "kafka")]
             kafka_config: KafkaConfig {
                 addr: "127.0.0.1".to_string(),
                 port: 88,

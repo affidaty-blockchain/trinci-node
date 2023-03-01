@@ -41,13 +41,14 @@ use trinci_core::{
     bridge::{BridgeConfig, BridgeService},
     crypto::{ed25519::KeyPair as Ed25519KeyPair, ed25519::PublicKey as Ed25519PublicKey, KeyPair},
     db::{Db, RocksDb, RocksDbFork},
-    kafka::{KafkaConfig, KafkaService}, // TODO: make it feature enabled
     p2p::{service::PeerConfig, PeerService},
     rest::{RestConfig, RestService},
     wm::{Wm, WmLocal},
-    ErrorKind,
-    Transaction,
+    ErrorKind, Transaction,
 };
+
+#[cfg(feature = "kafka")]
+use trinci_core::kafka::{KafkaConfig, KafkaService};
 
 /// Application context.
 pub struct App {
@@ -63,6 +64,7 @@ pub struct App {
     #[cfg(feature = "monitor")]
     pub monitor_svc: Option<MonitorService>,
     /// Kafka service TODO: make it optional
+    #[cfg(feature = "kafka")]
     pub kafka_svc: KafkaService,
     /// Keypair placeholder.
     pub keypair: Arc<KeyPair>,
@@ -423,11 +425,16 @@ impl App {
         };
         let rest_svc = RestService::new(rest_config, chan.clone());
 
-        let kafka_config = KafkaConfig {
-            addr: config.kafka_config.addr,
-            port: config.kafka_config.port,
+        #[cfg(feature = "kafka")]
+        let kafka_service = {
+            KafkaService::new(
+                KafkaConfig {
+                    addr: config.kafka_config.addr,
+                    port: config.kafka_config.port,
+                },
+                chan,
+            )
         };
-        let kafka_service = KafkaService::new(kafka_config, chan);
 
         App {
             block_svc: Arc::new(Mutex::new(block_svc)),
@@ -440,6 +447,7 @@ impl App {
             #[cfg(feature = "monitor")]
             monitor_svc: Some(monitor_svc),
             seed,
+            #[cfg(feature = "kafka")]
             kafka_svc: kafka_service,
         }
     }
@@ -648,7 +656,7 @@ impl App {
             self.monitor_svc.as_mut().unwrap().start(addr, file);
         }
 
-        // TODO: make it feature
+        #[cfg(feature = "kafka")]
         {
             self.kafka_svc.start();
         }
