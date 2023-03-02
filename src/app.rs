@@ -47,6 +47,9 @@ use trinci_core::{
     ErrorKind, Transaction,
 };
 
+#[cfg(feature = "kafka")]
+use trinci_core::kafka::{KafkaConfig, KafkaService};
+
 /// Application context.
 pub struct App {
     /// Block service context.
@@ -60,6 +63,9 @@ pub struct App {
     /// Monitor service context.
     #[cfg(feature = "monitor")]
     pub monitor_svc: Option<MonitorService>,
+    /// Kafka service TODO: make it optional
+    #[cfg(feature = "kafka")]
+    pub kafka_svc: KafkaService,
     /// Keypair placeholder.
     pub keypair: Arc<KeyPair>,
     /// p2p Keypair placeholder
@@ -254,7 +260,7 @@ impl App {
                     utils::get_bootstrap(&bootstrap_node_address, bootstrap_path.to_owned());
 
                 config.bootstrap_path = format!("data/{}.bin", &bootstrap_hash);
-                config.db_path = bootstrap_hash;
+                config.db_path = format!("db/{}", bootstrap_hash);
 
                 // Check if local version is coherent to the remote version.
                 utils::check_version(
@@ -417,7 +423,18 @@ impl App {
             port: config.rest_port,
             node_info,
         };
-        let rest_svc = RestService::new(rest_config, chan);
+        let rest_svc = RestService::new(rest_config, chan.clone());
+
+        #[cfg(feature = "kafka")]
+        let kafka_service = {
+            KafkaService::new(
+                KafkaConfig {
+                    addr: config.kafka_config.addr,
+                    port: config.kafka_config.port,
+                },
+                chan,
+            )
+        };
 
         App {
             block_svc: Arc::new(Mutex::new(block_svc)),
@@ -430,6 +447,8 @@ impl App {
             #[cfg(feature = "monitor")]
             monitor_svc: Some(monitor_svc),
             seed,
+            #[cfg(feature = "kafka")]
+            kafka_svc: kafka_service,
         }
     }
 
@@ -635,6 +654,11 @@ impl App {
             let addr: String = _addr.unwrap();
             let file: String = _file.unwrap();
             self.monitor_svc.as_mut().unwrap().start(addr, file);
+        }
+
+        #[cfg(feature = "kafka")]
+        {
+            self.kafka_svc.start();
         }
     }
 

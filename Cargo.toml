@@ -8,7 +8,8 @@ keywords = ["trinci", "blockchain", "node"]
 
 [dependencies]
 #ENABLES WHEN MERGING IN MASTER trinci-core = { git = "https://github.com/affidaty-blockchain/trinci-core" }
-trinci-core = { git = "https://ignore:icnAD-JTWci6TqfroMP7@gitlab.affidaty.net/developer2/trinci-github/trinci-core.git", branch = "develop" }
+#trinci-core = { git = "https://ignore:icnAD-JTWci6TqfroMP7@gitlab.affidaty.net/developer2/trinci-github/trinci-core.git", branch = "develop" }
+trinci-core = { path = "./trinci-core" }
 
 log = { version = "0.4.14", features = ["release_max_level_info"] }
 clap = { version = "3.1.0", features = ["cargo"] }
@@ -33,7 +34,6 @@ version-compare = "0.1.0"
 # autoreplicant feature dependencies
 ring = { version = "0.16.20", default-features = false, features = ["std"] }
 
-
 [dev-dependencies]
 glob = "0.3.0"
 
@@ -44,3 +44,4 @@ monitor = ["serde_json", "isahc", "ascii_table"]
 rt-monitor = ["trinci-core/rt-monitor"]
 indexer = ["trinci-core/indexer"]
 ro-exec = ["trinci-core/ro-exec"]
+kafka = ["trinci-core/kafka-producer"]
