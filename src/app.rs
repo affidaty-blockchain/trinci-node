@@ -260,7 +260,7 @@ impl App {
                     utils::get_bootstrap(&bootstrap_node_address, bootstrap_path.to_owned());
 
                 config.bootstrap_path = format!("data/{}.bin", &bootstrap_hash);
-                config.db_path = bootstrap_hash;
+                config.db_path = format!("db/{}", bootstrap_hash);
 
                 // Check if local version is coherent to the remote version.
                 utils::check_version(
