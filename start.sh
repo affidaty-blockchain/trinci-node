@@ -106,7 +106,7 @@ find_local_ip() {
 
 offline_start () {
     check_trinci_exec
-    ./target/debug/trinci-node --http-port $HTTP_PORT --bootstrap-path $BS_PATH_OFFLINE --db-path $DB_PATH"offline"
+    ./target/release/trinci-node --http-port $HTTP_PORT --bootstrap-path $BS_PATH_OFFLINE --db-path $DB_PATH"offline"
 }
 
 custom_start () {
@@ -120,7 +120,7 @@ custom_start () {
         echo "Insert remote bootstrap node ip/url. Es: https://192.168.0.1 or https://some-dns.org"
         read AUTOREPLICANT_NODE_IP
         check_trinci_exec
-        ./target/debug/trinci-node --local-ip $local_ip --public-ip $public_ip:${arrEndpointIp[1]} --http-port $HTTP_PORT --p2p-port ${arrEndpointIp[1]} --autoreplicant-procedure $AUTOREPLICANT_NODE_IP
+        ./target/release/trinci-node --local-ip $local_ip --public-ip $public_ip:${arrEndpointIp[1]} --http-port $HTTP_PORT --p2p-port ${arrEndpointIp[1]} --autoreplicant-procedure $AUTOREPLICANT_NODE_IP
     else
         echo "Insert p2p bootstrap address. es: '12D3KooWMFJAmuKyrAXjcGv8bhD8yRw2hNYx4CtBPj2cqQD83btd@/ip4/10.0.0.1/tcp/9006'"
         read CUSTOM_P2P_BOOTSTRAP_ADDRESS
@@ -129,7 +129,7 @@ custom_start () {
         echo "Insert boostrap file path"
         read CUSTOM_BS_PATH
         check_trinci_exec
-        ./target/debug/trinci-node --local-ip $local_ip --public-ip $public_ip:${arrEndpointIp[1]} --http-port $HTTP_PORT --p2p-port ${arrEndpointIp[1]} --bootstrap-path $CUSTOM_BS_PATH --p2p-bootstrap-addr $CUSTOM_P2P_BOOTSTRAP_ADDRESS --db-path $CUSTOM_DB_PATH
+        ./target/release/trinci-node --local-ip $local_ip --public-ip $public_ip:${arrEndpointIp[1]} --http-port $HTTP_PORT --p2p-port ${arrEndpointIp[1]} --bootstrap-path $CUSTOM_BS_PATH --p2p-bootstrap-addr $CUSTOM_P2P_BOOTSTRAP_ADDRESS --db-path $CUSTOM_DB_PATH
     fi
 }
 
@@ -141,7 +141,7 @@ start () {
     network=$1
     check_trinci_exec
     [[ $network = "testnet" ]] && AUTOREPLICANT_NODE_IP=$TESTNET_URL || AUTOREPLICANT_NODE_IP=$MAINNET_URL
-    ./target/debug/trinci-node --local-ip $local_ip --public-ip $public_ip:${arrEndpointIp[1]} --http-port $HTTP_PORT --p2p-port ${arrEndpointIp[1]} --autoreplicant-procedure $AUTOREPLICANT_NODE_IP
+    ./target/release/trinci-node --local-ip $local_ip --public-ip $public_ip:${arrEndpointIp[1]} --http-port $HTTP_PORT --p2p-port ${arrEndpointIp[1]} --autoreplicant-procedure $AUTOREPLICANT_NODE_IP
 }
 
 #MAIN
