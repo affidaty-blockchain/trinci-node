@@ -43,14 +43,12 @@ find_linux_local_ip_address() {
     # Check which command use.
     if command -v ip &> /dev/null
     then
-        local_ip=`ip addr | sed -n -e '/state UP/,/[0-9]: / p' | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1' | tr '\n' '|'`
-        local_ip=${local_ip%?}
-    fi
-
-    if command -v ifconfig &> /dev/null
+        local_ip=`ip addr | sed -n -e '/state UP/,/[0-9]: / p' | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1' | tr '\n' ' '`
+        #local_ip=${local_ip%?}
+    elif command -v ifconfig &> /dev/null
     then
-        local_ip=`ifconfig | sed -n -e '/UP/,/[0-9]: / p' | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1' | tr '\n' '|'`
-        local_ip=${local_ip%?}
+        local_ip=`ifconfig | sed -n -e '/UP/,/[0-9]: / p' | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1' | tr '\n' ' '`
+        #local_ip=${local_ip%?}
     fi
 
     if [ $? -ne 0 ]; then
