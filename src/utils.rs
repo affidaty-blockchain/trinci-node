@@ -15,11 +15,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with TRINCI. If not, see <https://www.gnu.org/licenses/>.
 
-use std::io::Read;
+use isahc::ReadResponseExt;
+use std::{
+    fs::File,
+    io::{Read, Write},
+};
 use trinci_core::{
     crypto::{ecdsa, ed25519, KeyPair},
+    rest::service::NodeInfo,
     Error, ErrorKind, Result,
 };
+
+use ring::digest;
 
 /// Load node account keypair.
 pub fn load_keypair(filename: Option<String>) -> Result<KeyPair> {
@@ -58,5 +65,63 @@ pub fn load_keypair(filename: Option<String>) -> Result<KeyPair> {
             let ed25519 = ed25519::KeyPair::from_random();
             Ok(KeyPair::Ed25519(ed25519))
         }
+    }
+}
+
+/// Collects node visa.
+pub fn get_visa(node_address: &str) -> Result<NodeInfo> {
+    match isahc::get(format!("{}/api/v1/visa", node_address)) {
+        Ok(mut response) => Ok(response.json().unwrap()),
+        Err(_) => Err(Error::new(ErrorKind::Other)),
+    }
+}
+
+/// Collects bootstrap file.
+pub fn get_bootstrap(node_address: &str, bootstrap_path: String) -> String {
+    match isahc::get(format!("{}/api/v1/bootstrap", node_address)) {
+        Ok(mut response) => {
+            println!("bootstrap retrieved");
+
+            let bootstrap_bytes = response.bytes().unwrap();
+
+            let mut hash = digest::digest(&digest::SHA256, &bootstrap_bytes)
+                .as_ref()
+                .to_vec();
+
+            let mut pre_hash: Vec<u8> = [0x12, 0x20].to_vec();
+            pre_hash.append(&mut hash);
+
+            let bs58 = bs58::encode(pre_hash);
+            let bootstrap_hash = bs58.into_string();
+            let bootstrap_path = format!("data/{}.bin", bootstrap_hash);
+
+            let mut file = File::create(&bootstrap_path).unwrap();
+            file.write(&bootstrap_bytes).unwrap();
+            bootstrap_hash
+        }
+        Err(error) => {
+            println!("Error occourred during get request: {}", error.to_string());
+            bootstrap_path
+        }
+    }
+}
+
+/// Given local and remote node version comunicates
+/// to the user if the local verison conflicts with the remote one.
+pub fn check_version(local_version: (String, String), remote_version: (String, String)) {
+    match (
+        version_compare::compare(local_version.0, remote_version.0).unwrap(),
+        version_compare::compare(remote_version.1, local_version.1).unwrap(),
+    ) {
+        (version_compare::Cmp::Lt, _) => warn!("local node version not up to date"),
+
+        (version_compare::Cmp::Gt, _) => {
+            warn!("local node version more recent than bootstrap node verison")
+        }
+        (_, version_compare::Cmp::Lt) => warn!("local core version not up to date"),
+        (_, version_compare::Cmp::Gt) => {
+            warn!("local core version more recent than bootstrap node verison")
+        }
+        (_, _) => (),
     }
 }

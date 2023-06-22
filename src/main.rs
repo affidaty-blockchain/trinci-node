@@ -156,6 +156,9 @@ fn main() {
     let chan = app.block_svc.lock().request_channel();
     std::thread::spawn(move || tracer::run(chan));
 
+    // Start litening into brigde soket
+    // TODO: make a module.
+
     info!("System up and running...");
     app.park();
 }

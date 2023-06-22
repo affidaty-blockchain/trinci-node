@@ -3,10 +3,11 @@
 # Node vars.
 TARGET_PORT=8001
 HTTP_PORT=8000
-BS_PATH='./data/prod-bootstrap.bin'
-BS_IP_ADDR='15.160.119.12' 
-BS_ADDR='@/ip4/15.160.119.12/tcp/9001'
-DB_PATH='./db/'
+BS_PATH_OFFLINE="./data/testnet-bootstrap.bin"
+TESTNET_URL="https://testnet.trinci.net"
+MAINNET_URL="https://mainnet.trinci.net"
+DB_PATH="./db/"
+AUTOREPLICANT_NODE="n"
 
 # Output settings.
 STEP_CODE="\033[0;33m"
@@ -14,54 +15,27 @@ CLEAN_CODE="\033[0m"
 SUCCESS_CODE="\033[0;32m"
 ERROR_CODE="\033[0;31m"
 
-echo -e "\nTrinci node start script v0.0.2 \n"
-
-unameOut="$(uname -s)"
-case "${unameOut}" in
-    Linux*)     ENVIRONMENT=Linux;;
-    Darwin*)    ENVIRONMENT=Mac;;
-esac
-
-echo -e "${SUCCESS_CODE}Gatering system environment: ${STEP_CODE}$ENVIRONMENT${CLEAN_CODE}"
-
-find_osx_local_ip_address() {
-    local_ip=`ifconfig | pcregrep -M -o '^[^\t:]+:([^\n]|\n\t)*status: active' | grep -w inet | awk '{print $2}'`
-    if [ $? -ne 0 ]; then
-        echo -e "${ERROR_CODE}Something went wrong checking local ip addresses. \n${CLEAN_CODE}"
-        exit 1
-    fi
-    # uPnP operation to deal externa ip.
-    target_ip=$local_ip
-
-    echo -e "${STEP_CODE}Local IPs: $local_ip ${CLEAN_CODE}"
+chose_network() {
+    echo "Choose an environment: offline, testnet, mainnet, custom.  Type 'q' to exit"
+    read NETWORK
+    case "${NETWORK}" in
+        offline*)   offline_start;;
+        testnet*)   start "$NETWORK";;
+        mainnet*)   start "$NETWORK";;
+        custom*)    custom_start;;
+        q*)         exit;;
+        *)          chose_network;;
+    esac
 }
 
-find_linux_local_ip_address() {
-    echo -e "${SUCCESS_CODE}Gatering network informations... \n${CLEAN_CODE}"
-
-    # Recover local ip.
-    # Check which command use.
-    if command -v ip &> /dev/null
-    then
-        local_ip=`ip addr | sed -n -e '/state UP/,/[0-9]: / p' | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1' | tr '\n' '|'`
-        local_ip=${local_ip%?}
-    fi
-
-    if command -v ifconfig &> /dev/null
-    then
-        local_ip=`ifconfig | sed -n -e '/UP/,/[0-9]: / p' | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1' | tr '\n' '|'`
-        local_ip=${local_ip%?}
-    fi
-
-    if [ $? -ne 0 ]; then
-        echo -e "${ERROR_CODE}Something went wrong checking local ip addresses. \n${CLEAN_CODE}"
-        exit 1
-    fi
-
-    # uPnP operation to deal externa ip.
-    target_ip=`hostname -I | awk '{print $1}'`
-
-    echo -e "${STEP_CODE}Local IPs: $local_ip ${CLEAN_CODE}"
+chose_autorepl() {
+    echo "Do you want to use auto replicant feature? [ y | n ]"
+    read AUTOREPLICANT_NODE
+    case "${AUTOREPLICANT_NODE}" in
+        y*)         AUTOREPLICANT_NODE='y';;
+        n*)         AUTOREPLICANT_NODE='n';;
+        *)          chose_autorepl;;
+    esac
 }
 
 find_remote_ip_address() {
@@ -82,115 +56,101 @@ negotiate_upnp_port() {
     arrEndpointIp=(${endpoint_ip//:/ })
 
     if [ -z "${endpoint_ip}" ]; then
-        echo -e "${ERROR_CODE}Handshaking went wrong, running node w/o P2P port ${CLEAN_CODE}" 
-        echo -e "${STEP_CODE}Endpoint IP: $public_ip \n ${CLEAN_CODE}"
+        echo -e "${ERROR_CODE}Handshaking went wrong, running node w/o P2P port ${CLEAN_CODE}"
+        exit 1
     else	
         echo -e "${STEP_CODE}Endpoint IP: $public_ip:${arrEndpointIp[1]} \n ${CLEAN_CODE}"
     fi
 }
 
-get_bs_address() {
-    # Retrieve BS addr ID
-    echo -e "${SUCCESS_CODE}Retrieving P2P bootstrap ID... ${CLEAN_CODE}"
-    bs_id=`curl -s http://t27.trinci.net:8000/api/v1/p2p/id` 
-    bs_addr="${bs_id}${BS_ADDR}"
-    echo -e "${STEP_CODE}Bootstrap address: $bs_addr\n ${CLEAN_CODE}"
-}
-
-base58()
-if
-    local -a base58_chars=(
-    1 2 3 4 5 6 7 8 9
-      A B C D E F G H   J K L M N   P Q R S T U V W X Y Z
-      a b c d e f g h i j k   m n o p q r s t u v w x y z
-    )
-    local OPTIND OPTARG o
-    getopts d o
-then
-    shift $((OPTIND - 1))
-    case $o in
-      d)
-        local input
-        read -r input < "${1:-/dev/stdin}"
-        if [[ "$input" =~ ^1.+ ]]
-        then printf "\x00"; ${FUNCNAME[0]} -d <<<"${input:1}"
-        elif [[ "$input" =~ ^[$(printf %s ${base58_chars[@]})]+$ ]]
-        then
-      {
-        printf "s%c\n" "${base58_chars[@]}" | nl -v 0
-        sed -e i0 -e 's/./ 58*l&+/g' -e aP <<<"$input"
-      } | dc
-        elif [[ -n "$input" ]]
-        then return 1
-        fi |
-        if [[ -t 1 ]]
-        then cat -v
-        else cat
-        fi
-        ;;
-    esac
-else
-    xxd -p -u "${1:-/dev/stdin}" |
-    tr -d '\n' |
-    {
-      read hex
-      while [[ "$hex" =~ ^00 ]]
-      do echo -n 1; hex="${hex:2}"
-      done
-      if test -n "$hex"
-      then
-    dc -e "16i0$hex Ai[58~rd0<x]dsxx+f" |
-    while read -r
-    do echo -n "${base58_chars[REPLY]}"
-    done
-      fi
-      echo
-    }
-fi
-
-if [ $ENVIRONMENT == "Linux" ]; then
-    find_linux_local_ip_address
-else
-    find_osx_local_ip_address
-fi
-
-get_db_folder() {
-    # Calculating DB path
-    if [ ! -f $BS_PATH ]; then
-        echo -e "${ERROR_CODE}Missing bootstrap file. \n${CLEAN_CODE}"
+check_trinci_exec() {
+    if [ ! -f "./target/release/trinci-node" ]; then
+        echo -e "${ERROR_CODE}Missing trinci executable. \n${CLEAN_CODE}"
         exit 1
     fi
-
-    echo -e "${SUCCESS_CODE}Calculating DB path...${CLEAN_CODE}"
-    bootstrap_hash=$(echo -n "1220"$(shasum -a 256 $BS_PATH | cut -f1 -d' ') | xxd -r -p | base58)
-    db_path="${DB_PATH}${bootstrap_hash}/"
-    echo -e "${STEP_CODE}DB path: $db_path ${CLEAN_CODE}"
 }
 
+find_local_ip() {
+    if [ $ENVIRONMENT == "Linux" ]; then
+        if command -v ip &> /dev/null
+        then
+            local_ip=`ip addr | sed -n -e '/state UP/,/[0-9]: / p' | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1' | tr '\n' '|'`
+            local_ip=${local_ip%?}
+        fi
 
-find_remote_ip_address
-negotiate_upnp_port
-get_bs_address
-get_db_folder
+        if command -v ifconfig &> /dev/null
+        then
+            local_ip=`ifconfig | sed -n -e '/UP/,/[0-9]: / p' | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1' | tr '\n' '|'`
+            local_ip=${local_ip%?}
+        fi
 
+        if [ $? -ne 0 ]; then
+            echo -e "${ERROR_CODE}Something went wrong checking local ip addresses. \n${CLEAN_CODE}"
+            exit 1
+        fi
 
-# Launch node.
-if [ ! -f "./target/release/trinci-node" ]; then
-    echo -e "${ERROR_CODE}Missing trinci executable. \n${CLEAN_CODE}"
-    exit 1
-fi
+        # uPnP operation to deal externa ip.
+        target_ip=`hostname -I | awk '{print $1}'`
+    else
+        local_ip=`ifconfig | pcregrep -M -o '^[^\t:]+:([^\n]|\n\t)*status: active' | grep -w inet | awk '{print $2}'`
+        if [ $? -ne 0 ]; then
+            echo -e "${ERROR_CODE}Something went wrong checking local ip addresses. \n${CLEAN_CODE}"
+            exit 1
+        fi
+        # uPnP operation to deal externa ip.
+        target_ip=$local_ip
+    fi
 
-echo -e "${SUCCESS_CODE}Starting trinci node... \n ${CLEAN_CODE}"
+    echo -e "${STEP_CODE}Local IPs: $local_ip ${CLEAN_CODE}"
+}
 
-if [ -z "${endpoint_ip}" ]; then
-	# If uPnP went wrong.
-	./target/release/trinci-node --local-ip $local_ip --public-ip $public_ip --http-port $HTTP_PORT --bootstrap-path $BS_PATH --p2p-bootstrap-addr $bs_addr --db-path $db_path
-elif [ -z "${public_ip}" ]; then
-	# If no public IP.
-	./target/release/trinci-node --local-ip $local_ip --http-port $HTTP_PORT --p2p-port ${arrEndpointIp[1]} --bootstrap-path $BS_PATH --p2p-bootstrap-addr $bs_addr --db-path $db_path 
-else
-	# If all went good
-	cmd="./target/release/trinci-node --local-ip $local_ip --public-ip $public_ip:${arrEndpointIp[1]} --http-port $HTTP_PORT --p2p-port ${arrEndpointIp[1]} --bootstrap-path $BS_PATH --p2p-bootstrap-addr $bs_addr --db-path $db_path" 
-fi
+offline_start () {
+    check_trinci_exec
+    ./target/release/trinci-node --http-port $HTTP_PORT --bootstrap-path $BS_PATH_OFFLINE --db-path $DB_PATH"offline"
+}
 
-$cmd
+custom_start () {
+    chose_autorepl
+    find_remote_ip_address
+    find_local_ip
+    negotiate_upnp_port
+
+    if [ $AUTOREPLICANT_NODE == "y" ] 
+    then
+        echo "Insert remote bootstrap node ip/url. Es: https://192.168.0.1 or https://some-dns.org"
+        read AUTOREPLICANT_NODE_IP
+        check_trinci_exec
+        ./target/release/trinci-node --local-ip $local_ip --public-ip $public_ip:${arrEndpointIp[1]} --http-port $HTTP_PORT --p2p-port ${arrEndpointIp[1]} --autoreplicant-procedure $AUTOREPLICANT_NODE_IP
+    else
+        echo "Insert p2p bootstrap address. es: '12D3KooWMFJAmuKyrAXjcGv8bhD8yRw2hNYx4CtBPj2cqQD83btd@/ip4/10.0.0.1/tcp/9006'"
+        read CUSTOM_P2P_BOOTSTRAP_ADDRESS
+        echo "Insert database path"
+        read CUSTOM_DB_PATH
+        echo "Insert boostrap file path"
+        read CUSTOM_BS_PATH
+        check_trinci_exec
+        ./target/release/trinci-node --local-ip $local_ip --public-ip $public_ip:${arrEndpointIp[1]} --http-port $HTTP_PORT --p2p-port ${arrEndpointIp[1]} --bootstrap-path $CUSTOM_BS_PATH --p2p-bootstrap-addr $CUSTOM_P2P_BOOTSTRAP_ADDRESS --db-path $CUSTOM_DB_PATH
+    fi
+}
+
+start () {
+    find_remote_ip_address
+    find_local_ip
+    negotiate_upnp_port
+
+    network=$1
+    check_trinci_exec
+    [[ $network = "testnet" ]] && AUTOREPLICANT_NODE_IP=$TESTNET_URL || AUTOREPLICANT_NODE_IP=$MAINNET_URL
+    ./target/release/trinci-node --local-ip $local_ip --public-ip $public_ip:${arrEndpointIp[1]} --http-port $HTTP_PORT --p2p-port ${arrEndpointIp[1]} --autoreplicant-procedure $AUTOREPLICANT_NODE_IP
+}
+
+#MAIN
+echo -e "\nTrinci node start script v0.1.0 \n"
+
+unameOut="$(uname -s)"
+case "${unameOut}" in
+    Linux*)     ENVIRONMENT="Linux";;
+    Darwin*)    ENVIRONMENT="Mac";;
+esac
+
+chose_network

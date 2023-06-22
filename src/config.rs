@@ -23,6 +23,8 @@ use std::{fs, path::Path};
 use toml::Value;
 #[cfg(feature = "indexer")]
 use trinci_core::blockchain::indexer::IndexerConfig;
+#[cfg(feature = "kafka")]
+use trinci_core::kafka::KafkaConfig;
 
 /// Default service account.
 pub const SERVICE_ACCOUNT_ID: &str = "TRINCI";
@@ -35,6 +37,9 @@ pub const DEFAULT_LOG_LEVEL: &str = "info";
 
 /// Default bootstrap file path.
 pub const DEFAULT_BOOTSTRAP_PATH: &str = "bootstrap.bin";
+
+/// Default bootstrap replicant file path.
+pub const DEFAULT_BOOTSTRAP_REPLICANT_PATH: &str = "replicant";
 
 /// Default network identifier.
 pub const DEFAULT_NETWORK_ID: &str = "bootstrap";
@@ -124,6 +129,10 @@ pub struct Config {
     /// Indexer Configuration
     #[cfg(feature = "indexer")]
     pub indexer_config: IndexerConfig,
+    /// Bootstrap node for autoreplicant procedure.
+    pub bootstrap_node_address: Option<String>,
+    #[cfg(feature = "kafka")]
+    pub kafka_config: KafkaConfig,
 }
 
 impl Default for Config {
@@ -152,6 +161,12 @@ impl Default for Config {
             public_ip: None,
             #[cfg(feature = "indexer")]
             indexer_config: IndexerConfig::default(),
+            bootstrap_node_address: None,
+            #[cfg(feature = "kafka")]
+            kafka_config: KafkaConfig {
+                addr: "127.0.0.1".to_string(),
+                port: 9777,
+            },
         }
     }
 }
@@ -257,6 +272,16 @@ impl Config {
                 config.indexer_config.password = value.to_owned();
             }
         }
+        #[cfg(feature = "kafka")]
+        if let Some(value) = map.get("kafka-addr").and_then(|value| value.as_str()) {
+            config.kafka_config.addr = value.to_owned();
+            if let Some(value) = map.get("kafka-addr").and_then(|value| value.as_integer()) {
+                config.kafka_config.port = value as u16;
+            } else {
+                warn!("Kafka file setup missing port")
+            }
+        }
+
         Some(config)
     }
 }
@@ -388,6 +413,27 @@ pub fn create_app_config() -> Config {
             .value_name("IP")
             .required(false),
         )
+        .arg(
+            clap::Arg::new("autorepl")// TODO: use another flag
+            .long("autoreplicant-procedure")
+            .help("If used, the node tries to autoreplicate the bootstrap node passed as argument (default None)")
+            .value_name("IP/ADDRESS")
+            .required(false),
+        )
+        .arg(
+            clap::Arg::new("kafka-addr")
+            .long("kafka-addr")
+            .help("Setup kafka address")
+            .value_name("IP/ADDRESS")
+            .required(false),
+        )
+        .arg(
+            clap::Arg::new("kafka-port")
+            .long("kafka-port")
+            .help("Setup kafka port")
+            .value_name("PORT")
+            .required(false),
+        )
         .get_matches();
 
     let config_file = matches.value_of("config").unwrap_or(DEFAULT_CONFIG_FILE);
@@ -448,8 +494,22 @@ pub fn create_app_config() -> Config {
     if let Some(value) = matches.value_of("local-ip") {
         config.local_ip = Some(value.to_owned());
     }
+    if let Some(value) = matches.value_of("autorepl") {
+        config.bootstrap_node_address = Some(value.to_owned());
+    }
     if matches.is_present("offline") {
         config.offline = true;
+    }
+    #[cfg(feature = "kafka")]
+    if let Some(value) = matches.value_of("kafka-addr") {
+        config.kafka_config.addr = value.to_owned();
+    }
+    #[cfg(feature = "kafka")]
+    if let Some(value) = matches
+        .value_of("kafka-port")
+        .and_then(|value| value.parse::<u16>().ok())
+    {
+        config.kafka_config.port = value;
     }
     config
 }
@@ -522,6 +582,12 @@ mod tests {
             p2p_keypair: None,
             #[cfg(feature = "indexer")]
             indexer_config: IndexerConfig::default(),
+            bootstrap_node_address: None,
+            #[cfg(feature = "kafka")]
+            kafka_config: KafkaConfig {
+                addr: "127.0.0.1".to_string(),
+                port: 88,
+            },
         }
     }
 

@@ -1,6 +1,6 @@
 [package]
 name = "trinci-node"
-version = "0.2.9"
+version = "0.2.10"
 authors = ["The Trinci Team <trinci@affidaty.io>"]
 edition = "2021"
 description = "TRINCI blockchain node"
@@ -8,6 +8,7 @@ keywords = ["trinci", "blockchain", "node"]
 
 [dependencies]
 trinci-core = { git = "https://github.com/affidaty-blockchain/trinci-core" }
+
 
 log = { version = "0.4.14", features = ["release_max_level_info"] }
 clap = { version = "3.1.0", features = ["cargo"] }
@@ -24,11 +25,13 @@ tempfile = "3.2.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", optional = true }
 # POST
-isahc = { version = "1.6.0", optional = true }
+isahc = { version = "1.6.0", features = ["json"], optional = true }
 # pretty print on file
 ascii_table = { version = "4.0.2", optional = true }
 # versioning comparer
 version-compare = "0.1.0"
+# autoreplicant feature dependencies
+ring = { version = "0.16.20", default-features = false, features = ["std"] }
 
 [dev-dependencies]
 glob = "0.3.0"
@@ -40,3 +43,4 @@ monitor = ["serde_json", "isahc", "ascii_table"]
 rt-monitor = ["trinci-core/rt-monitor"]
 indexer = ["trinci-core/indexer"]
 ro-exec = ["trinci-core/ro-exec"]
+kafka = ["trinci-core/kafka-producer"]

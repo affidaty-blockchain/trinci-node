@@ -26,7 +26,13 @@ Additional labels for pre-release metadata:
 * beta.x: shipped version under testing.
 * rc.x: stable release candidate.
 
-0.2.9-rc1 28-07-2022
+0.2.10 03-03-2023
+----------------
+Added
+ * Autoreplicant modules
+ * Kafka features
+
+0.2.9 unreleased
 ----------------
 Added
  * readonly-exec feature
