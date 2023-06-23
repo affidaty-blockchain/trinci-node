@@ -5,7 +5,7 @@ TARGET_PORT=8001
 HTTP_PORT=8000
 BS_PATH_OFFLINE="./data/testnet-bootstrap.bin"
 TESTNET_URL="https://testnet.trinci.net"
-MAINNET_URL="https://mainnet.trinci.net"
+MAINNET_URL="https://relay.mainnet.trinci.net"
 DB_PATH="./db/"
 AUTOREPLICANT_NODE="n"
 
