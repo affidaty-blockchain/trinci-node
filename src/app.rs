@@ -163,14 +163,13 @@ fn bootstrap_monitor(chan: BlockRequestSender) {
         match res_chan.recv_sync() {
             Ok(Message::GetBlockResponse { .. }) => {
                 if is_service_present(&chan) {
-                    debug!("Bootstrap is over, switching to a better validator check...");
-
+                    info!("Bootstrap execution ended, node ready to be part of the network");
                     break;
                 } else {
                     panic!("Block constructed but 'service' account is not yet active");
                 }
             }
-            Ok(res) => info!("Bootstrap subscribe response: {:?}", res),
+            Ok(res) => debug!("Bootstrap subscribe response: {:?}", res),
             Err(err) => error!("Channel error: {}", err),
         }
     }
@@ -590,7 +589,7 @@ impl App {
                     let mut config = load_config_from_service(&chan.clone());
 
                     config.network_name = Some(good_network_name);
-                    warn!("network name: {:?}", config.network_name);
+                    info!("network name: {:?}", config.network_name);
                     bs.stop();
 
                     let net_name = config.network_name.clone().unwrap(); // This shall not fail
@@ -641,7 +640,7 @@ impl App {
             }
         }
 
-        warn!("Starting the services");
+        info!("Starting the services");
 
         self.rest_svc.start();
         if p2p_start {
