@@ -80,7 +80,7 @@ pub fn get_visa(node_address: &str) -> Result<NodeInfo> {
 pub fn get_bootstrap(node_address: &str, bootstrap_path: String) -> String {
     match isahc::get(format!("{}/api/v1/bootstrap", node_address)) {
         Ok(mut response) => {
-            println!("bootstrap retrieved");
+            info!("Bootstrap retrieved from relay node ({})", node_address);
 
             let bootstrap_bytes = response.bytes().unwrap();
 
